@@ -1,11 +1,7 @@
+import Home from "./pages/Home";
+
 function App() {
-  return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <h1 className="text-6xl font-extrabold text-white">
-        Welcome to SwarmOS 🚀
-      </h1>
-    </div>
-  );
+  return <Home />;
 }
 
 export default App;
