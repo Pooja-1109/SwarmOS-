@@ -1,38 +1,99 @@
-import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import Sidebar from "../components/layout/Sidebar";
+import { getDashboard } from "../services/dashboardService";
 
-function Dashboard() {
-  const { user, logout } = useAuth();
+export default function Dashboard() {
+  const [dashboard, setDashboard] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  const navigate = useNavigate();
+  useEffect(() => {
+    loadDashboard();
+  }, []);
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
+  const loadDashboard = async () => {
+    try {
+      const data = await getDashboard();
+
+      console.log("Dashboard Data:", data);
+
+      setDashboard(data);
+    } catch (error) {
+      console.error("Dashboard Error:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white p-10">
-      <h1 className="text-4xl font-bold mb-4">
-        Welcome {user?.name}
-      </h1>
+    <div className="flex min-h-screen bg-zinc-950 text-white">
+      <Sidebar />
 
-      <p className="mb-2">
-        Email: {user?.email}
-      </p>
+      <div className="ml-64 flex-1 p-8">
+        <h1 className="mb-8 text-4xl font-bold">📊 Dashboard</h1>
 
-      <p className="mb-8">
-        Role: {user?.role}
-      </p>
+        {loading && <p>Loading...</p>}
 
-      <button
-        onClick={handleLogout}
-        className="rounded-lg bg-red-600 px-6 py-3"
-      >
-        Logout
-      </button>
+        {!loading && dashboard && (
+          <>
+            <div className="grid grid-cols-4 gap-6">
+              <div className="rounded-xl bg-zinc-900 p-6">
+                <h2>Total Projects</h2>
+                <p className="text-4xl font-bold">
+                  {dashboard.totalProjects}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-zinc-900 p-6">
+                <h2>Running</h2>
+                <p className="text-4xl font-bold text-yellow-400">
+                  {dashboard.runningProjects}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-zinc-900 p-6">
+                <h2>Completed</h2>
+                <p className="text-4xl font-bold text-green-400">
+                  {dashboard.completedProjects}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-zinc-900 p-6">
+                <h2>Pending</h2>
+                <p className="text-4xl font-bold text-red-400">
+                  {dashboard.pendingProjects}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-10">
+              <h2 className="mb-4 text-2xl font-bold">
+                Recent Projects
+              </h2>
+
+              {dashboard.recentProjects?.length > 0 ? (
+                dashboard.recentProjects.map((project: any) => (
+                  <div
+                    key={project._id}
+                    className="mb-3 rounded-lg bg-zinc-900 p-4"
+                  >
+                    <h3 className="text-xl font-semibold">
+                      {project.title}
+                    </h3>
+
+                    <p>{project.description}</p>
+
+                    <span className="text-cyan-400">
+                      {project.status}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p>No projects found.</p>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
-
-export default Dashboard;

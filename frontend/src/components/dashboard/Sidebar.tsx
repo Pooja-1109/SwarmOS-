@@ -36,56 +36,58 @@ export default function Sidebar() {
     },
   ];
 
-  return (
-    <div className="fixed left-0 top-0 flex h-screen w-64 flex-col border-r border-zinc-800 bg-zinc-950">
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
 
+  return (
+    <aside className="fixed left-0 top-0 flex h-screen w-64 flex-col bg-zinc-950 border-r border-zinc-800">
+
+      {/* Logo */}
       <div className="border-b border-zinc-800 p-6">
-        <h1 className="text-3xl font-bold text-cyan-400">
+        <h1 className="text-4xl font-extrabold text-cyan-400">
           SwarmOS
         </h1>
 
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-2 text-sm text-zinc-400">
           Multi-Agent AI Platform
         </p>
       </div>
 
-      <div className="mt-6 flex-1 px-4">
-
+      {/* Navigation */}
+      <nav className="flex-1 px-4 py-6 space-y-2">
         {menu.map((item) => {
           const Icon = item.icon;
+          const active = location.pathname === item.path;
 
           return (
             <Link
               key={item.path}
               to={item.path}
-              className={`mb-2 flex items-center gap-3 rounded-xl px-4 py-3 transition ${
-                location.pathname === item.path
-                  ? "bg-cyan-600 text-white"
-                  : "text-zinc-400 hover:bg-zinc-800"
+              className={`flex items-center gap-4 rounded-xl px-4 py-4 font-medium transition-all duration-300 ${
+                active
+                  ? "bg-cyan-600 text-white shadow-lg"
+                  : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
               }`}
             >
-              <Icon size={20} />
-              {item.name}
+              <Icon size={22} />
+              <span>{item.name}</span>
             </Link>
           );
         })}
+      </nav>
 
-      </div>
-
+      {/* Logout */}
       <div className="border-t border-zinc-800 p-4">
-
         <button
-          onClick={() => {
-            logout();
-            navigate("/login");
-          }}
-          className="flex w-full items-center gap-3 rounded-xl bg-red-600 px-4 py-3 font-semibold hover:bg-red-500"
+          onClick={handleLogout}
+          className="flex w-full items-center justify-center gap-3 rounded-xl bg-red-600 px-4 py-3 font-semibold text-white transition hover:bg-red-500"
         >
-          <LogOut size={18} />
+          <LogOut size={20} />
           Logout
         </button>
-
       </div>
-    </div>
+    </aside>
   );
 }

@@ -27,14 +27,31 @@ function Login() {
     try {
       setLoading(true);
 
+      console.log("Sending Login Request...");
+      console.log(formData);
+
       const data = await loginUser(formData);
 
+      console.log("✅ Login Response:", data);
+
       login(data.token, data.user);
+
+      console.log(
+        "✅ Token Saved:",
+        localStorage.getItem("token")
+      );
+
+      console.log(
+        "✅ User Saved:",
+        localStorage.getItem("user")
+      );
 
       alert("✅ Login Successful");
 
       navigate("/dashboard");
     } catch (err: any) {
+      console.error("❌ Login Error:", err);
+
       alert(err.response?.data?.message || "Login Failed");
     } finally {
       setLoading(false);
@@ -58,6 +75,7 @@ function Login() {
           placeholder="Email"
           value={formData.email}
           onChange={handleChange}
+          required
         />
 
         <input
@@ -67,9 +85,11 @@ function Login() {
           placeholder="Password"
           value={formData.password}
           onChange={handleChange}
+          required
         />
 
         <button
+          type="submit"
           className="w-full rounded bg-blue-600 p-3 hover:bg-blue-500"
           disabled={loading}
         >
