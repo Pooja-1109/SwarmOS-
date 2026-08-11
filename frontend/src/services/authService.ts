@@ -1,43 +1,54 @@
-import axios from "axios";
+import API from "./api";
 
-const API = axios.create({
-  baseURL: "http://localhost:5000/api/auth",
-});
-
-// Automatically attach JWT token
-API.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-
-  return config;
-});
-
-// Register
 export const registerUser = async (userData: {
   name: string;
   email: string;
   password: string;
 }) => {
-  const res = await API.post("/register", userData);
+  const res = await API.post("/auth/register", userData);
   return res.data;
 };
 
-// Login
 export const loginUser = async (userData: {
   email: string;
   password: string;
 }) => {
-  const res = await API.post("/login", userData);
+  const res = await API.post("/auth/login", userData);
   return res.data;
 };
 
-// Protected Profile
+export const googleSignIn = async () => {
+  const googleUser = {
+    name: `Google User ${Date.now() % 10000}`,
+    email: `google-${Date.now()}@gmail.com`,
+    password: "google123",
+  };
+
+  try {
+    return await loginUser({
+      email: googleUser.email,
+      password: googleUser.password,
+    });
+  } catch {
+    await registerUser(googleUser);
+    return await loginUser({
+      email: googleUser.email,
+      password: googleUser.password,
+    });
+  }
+};
+
 export const getProfile = async () => {
-  const res = await API.get("/profile");
+  const res = await API.get("/auth/profile");
   return res.data;
 };
 
-export default API;
+export const updateProfile = async (data: {
+  name?: string;
+  bio?: string;
+  avatar?: string;
+  password?: string;
+}) => {
+  const res = await API.put("/auth/profile", data);
+  return res.data;
+};

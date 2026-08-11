@@ -101,6 +101,26 @@ export default function Home() {
           agents working together.
         </motion.p>
 
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="mt-8 flex flex-wrap items-center justify-center gap-4"
+        >
+          <a
+            href="/login"
+            className="rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-500"
+          >
+            Sign in
+          </a>
+          <a
+            href="/register"
+            className="rounded-xl border border-zinc-700 bg-zinc-900 px-6 py-3 font-semibold text-white transition hover:border-blue-500 hover:text-blue-300"
+          >
+            Create account
+          </a>
+        </motion.div>
+
         {/* Input */}
         <div className="mt-10 flex w-full max-w-3xl gap-4">
           <input
