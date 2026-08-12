@@ -4,6 +4,8 @@ export const registerUser = async (userData: {
   name: string;
   email: string;
   password: string;
+  whatsappNumber?: string;
+  whatsappOptIn?: boolean;
 }) => {
   const res = await API.post("/auth/register", userData);
   return res.data;

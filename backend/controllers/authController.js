@@ -29,7 +29,7 @@ const registerUser = async (req, res) => {
       whatsappNumber: normalizedWhatsAppNumber ? `+${normalizedWhatsAppNumber}` : "",
       whatsappOptIn: optIn,
       whatsappOptInAt: optIn ? new Date() : null,
-      whatsappStatus: optIn ? "connected" : "not_connected",
+      whatsappStatus: optIn ? "pending" : "not_connected",
     });
 
     const token = jwt.sign(
@@ -101,6 +101,9 @@ const loginUser = async (req, res) => {
         role: user.role,
         bio: user.bio,
         avatar: user.avatar,
+        whatsappNumber: user.whatsappNumber || "",
+        whatsappOptIn: Boolean(user.whatsappOptIn),
+        whatsappStatus: user.whatsappStatus || "not_connected",
       },
     });
   } catch (error) {
@@ -141,7 +144,7 @@ const updateProfile = async (req, res) => {
     if (whatsappOptIn !== undefined) {
       user.whatsappOptIn = Boolean(whatsappOptIn);
       user.whatsappOptInAt = user.whatsappOptIn ? new Date() : null;
-      user.whatsappStatus = user.whatsappOptIn ? "connected" : "not_connected";
+      user.whatsappStatus = user.whatsappOptIn ? "pending" : "not_connected";
     }
 
     await user.save();

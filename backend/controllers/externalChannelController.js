@@ -37,7 +37,26 @@ const handleVoiceWebhook = async (req, res) => {
   }
 };
 
+const verifyWhatsAppWebhook = (req, res) => {
+  const mode = req.query["hub.mode"];
+  const token = req.query["hub.verify_token"];
+  const challenge = req.query["hub.challenge"];
+
+  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN || "swarmos_verify_token";
+
+  if (mode && token) {
+    if (mode === "subscribe" && token === verifyToken) {
+      console.log("✅ Meta WhatsApp Webhook verified successfully");
+      return res.status(200).send(challenge);
+    } else {
+      return res.sendStatus(403);
+    }
+  }
+  res.status(200).json({ status: "SwarmOS WhatsApp Webhook Endpoint Active", mode: process.env.WHATSAPP_MODE || "mock" });
+};
+
 module.exports = {
+  verifyWhatsAppWebhook,
   handleWhatsAppWebhook,
   handleVoiceWebhook,
 };

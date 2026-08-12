@@ -7,6 +7,9 @@ interface User {
   role?: string;
   bio?: string;
   avatar?: string;
+  whatsappNumber?: string;
+  whatsappOptIn?: boolean;
+  whatsappStatus?: string;
 }
 
 interface AuthContextType {

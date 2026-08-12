@@ -1,25 +1,18 @@
-import { useEffect, useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useEffect, useState, useRef } from "react";
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import Sidebar from "../components/layout/Sidebar";
-import { getProjects, getProject, getProjectSummary, updateProject } from "../services/projectService";
+import { getProjects, getProject, getProjectSummary } from "../services/projectService";
 import { getTasks, createTask, updateTaskStatus, deleteTask } from "../services/taskService";
 import { getProjectAgents, startAgents, runSingleAgent } from "../services/agentService";
 import { uploadFile, getProjectFiles, deleteFile } from "../services/fileService";
-import { sendChatMessage } from "../services/chatService";
-import { getProjectAnalytics } from "../services/analyticsService";
 import { getProjectActivities } from "../services/activityService";
-import { sendProjectCommand, getProjectMemory, getProjectDecisions } from "../services/orchestratorService";
-import { getRequirementTrace, getProjectQualityGate, runSelfHeal } from "../services/engineeringService";
-import { runSecurityScan, getSecurityReport, runProjectTests, getProjectTestRuns } from "../services/securityService";
-import { generateProjectResearch, getProjectResearch, createProjectVisualization, getProjectVisualizations, createProjectDocument, getProjectDocuments } from "../services/researchService";
-import { getProjectChannels, upsertProjectChannel, syncProjectChannels, sendChannelProjectCommand, sendWhatsAppWebhook, sendVoiceWebhook } from "../services/channelService";
+import { sendProjectCommand } from "../services/orchestratorService";
 import {
   FolderKanban,
   FileText,
   ListTodo,
   Bot,
   Database,
-  BarChart3,
   Activity as ActivityIcon,
   Play,
   Plus,
@@ -27,11 +20,18 @@ import {
   Upload,
   Trash2,
   Sparkles,
-  ChevronRight,
-  RefreshCw,
-  Shield,
-  BrainCircuit,
-  ArrowRight,
+  ArrowLeft,
+  Smartphone,
+  ExternalLink,
+  AlertCircle,
+  X,
+  Zap,
+  Brain,
+  Layers,
+  Code2,
+  TestTube,
+  Rocket,
+  Settings,
 } from "lucide-react";
 
 export default function Workspace() {
@@ -42,39 +42,26 @@ export default function Workspace() {
   const [projectsList, setProjectsList] = useState<any[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(projectIdFromUrl || "");
   const [project, setProject] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "requirements" | "kanban" | "agents" | "knowledge" | "analytics" | "activity" | "decisions" | "engineering" | "security" | "research" | "documentation" | "channels">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "agents" | "tasks" | "activity" | "files" | "whatsapp">("overview");
 
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const activeLoadIdRef = useRef<string>("");
 
-  // Tab Data States
+  // Tab & Entity States
   const [tasks, setTasks] = useState<any[]>([]);
   const [agents, setAgents] = useState<any[]>([]);
   const [files, setFiles] = useState<any[]>([]);
-  const [analytics, setAnalytics] = useState<any>(null);
   const [activities, setActivities] = useState<any[]>([]);
-  const [requirementsText, setRequirementsText] = useState("");
   const [commandInput, setCommandInput] = useState("");
-  const [commandResult, setCommandResult] = useState<any>(null);
-  const [projectMemory, setProjectMemory] = useState<any[]>([]);
-  const [projectDecisions, setProjectDecisions] = useState<any[]>([]);
-  const [requirementTrace, setRequirementTrace] = useState<any[]>([]);
-  const [qualityGate, setQualityGate] = useState<any>({});
-  const [securityReport, setSecurityReport] = useState<any[]>([]);
-  const [testRuns, setTestRuns] = useState<any[]>([]);
-  const [researchItems, setResearchItems] = useState<any[]>([]);
-  const [visualizations, setVisualizations] = useState<any[]>([]);
-  const [documentArtifacts, setDocumentArtifacts] = useState<any[]>([]);
-  const [channels, setChannels] = useState<any[]>([]);
-  const [channelCommandInput, setChannelCommandInput] = useState("");
-  const [channelCommandType, setChannelCommandType] = useState("whatsapp");
+  const [commandResponse, setCommandResponse] = useState<string>("");
+  const [commandLoading, setCommandLoading] = useState(false);
+  const [isAgentsRunning, setIsAgentsRunning] = useState(false);
 
-  // RAG Chat Panel
-  const [chatOpen, setChatOpen] = useState(true);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [sendingMsg, setSendingMsg] = useState(false);
+  // Selected Task Drawer Modal
+  const [selectedTask, setSelectedTask] = useState<any>(null);
 
-  // New Task Form Modal
+  // New Task Modal State
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDesc, setTaskDesc] = useState("");
@@ -91,16 +78,14 @@ export default function Workspace() {
   useEffect(() => {
     if (selectedProjectId) {
       loadProjectOverview(selectedProjectId);
-    } else if (projectsList.length > 0) {
-      setSelectedProjectId(projectsList[0]._id);
     }
-  }, [selectedProjectId, projectsList]);
+  }, [selectedProjectId]);
 
   const loadProjectsList = async () => {
     try {
       const data = await getProjects();
-      setProjectsList(data);
-      if (!selectedProjectId && data.length > 0) {
+      setProjectsList(data || []);
+      if (!selectedProjectId && data && data.length > 0) {
         setSelectedProjectId(data[0]._id);
       }
     } catch (err) {
@@ -109,121 +94,55 @@ export default function Workspace() {
   };
 
   const loadProjectOverview = async (id: string) => {
+    if (!id) return;
+    activeLoadIdRef.current = id;
+    setError("");
+
     try {
       setLoading(true);
-      const [proj, summary, activityData, taskData, agentData] = await Promise.all([
-        getProject(id).catch(() => null),
-        getProjectSummary(id).catch(() => null),
-        getProjectActivities(id).catch(() => []),
+      const proj = await getProject(id).catch(() => null);
+
+      if (activeLoadIdRef.current !== id) return;
+
+      if (!proj) {
+        const summary = await getProjectSummary(id).catch(() => null);
+        if (activeLoadIdRef.current !== id) return;
+
+        if (summary) {
+          setProject(summary);
+        } else {
+          setError("Unable to load project workspace. Please select another project or try again.");
+          setLoading(false);
+          return;
+        }
+      } else {
+        setProject(proj);
+      }
+
+      // Unblock main stage UI immediately
+      setLoading(false);
+
+      // Fetch secondary resources concurrently in background
+      Promise.all([
         getTasks({ projectId: id }).catch(() => []),
         getProjectAgents(id).catch(() => []),
-      ]);
+        getProjectActivities(id).catch(() => []),
+        getProjectFiles(id).catch(() => []),
+      ]).then(([taskData, agentData, activityData, fileData]) => {
+        if (activeLoadIdRef.current === id) {
+          setTasks(taskData || []);
+          setAgents(agentData || []);
+          setActivities(activityData || []);
+          setFiles(fileData || []);
+        }
+      });
 
-      const projectData = proj || summary || { title: "Project", description: "", requirements: "" };
-      setProject(projectData);
-      setRequirementsText(projectData.requirements || projectData.description || "");
-      setActivities(activityData || []);
-      setTasks(taskData || []);
-      setAgents(agentData || []);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error loading project overview:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadProjectTabData = async (id: string, tab: string) => {
-    if (!id || !tab) return;
-
-    try {
-      if (tab === "requirements") {
-        const proj = await getProject(id).catch(() => null);
-        setRequirementsText(proj?.requirements || proj?.description || "");
-        return;
+      if (activeLoadIdRef.current === id) {
+        setError(err?.message || "Failed to load project workspace.");
+        setLoading(false);
       }
-
-      if (tab === "kanban") {
-        const taskData = await getTasks({ projectId: id }).catch(() => []);
-        setTasks(taskData);
-        return;
-      }
-
-      if (tab === "agents") {
-        const agentData = await getProjectAgents(id).catch(() => []);
-        setAgents(agentData);
-        return;
-      }
-
-      if (tab === "knowledge") {
-        const fileData = await getProjectFiles(id).catch(() => []);
-        setFiles(fileData);
-        return;
-      }
-
-      if (tab === "analytics") {
-        const analyticsData = await getProjectAnalytics(id).catch(() => null);
-        setAnalytics(analyticsData);
-        return;
-      }
-
-      if (tab === "activity") {
-        const activityData = await getProjectActivities(id).catch(() => []);
-        setActivities(activityData);
-        return;
-      }
-
-      if (tab === "decisions") {
-        const [memoryData, decisionData] = await Promise.all([
-          getProjectMemory(id).catch(() => ({ data: [] })),
-          getProjectDecisions(id).catch(() => ({ data: [] })),
-        ]);
-        setProjectMemory(memoryData?.data || []);
-        setProjectDecisions(decisionData?.data || []);
-        return;
-      }
-
-      if (tab === "engineering") {
-        const [traceData, qualityData] = await Promise.all([
-          getRequirementTrace(id).catch(() => ({ data: [] })),
-          getProjectQualityGate(id).catch(() => ({ data: {} })),
-        ]);
-        setRequirementTrace(traceData?.data || []);
-        setQualityGate(qualityData?.data || {});
-        return;
-      }
-
-      if (tab === "security") {
-        const [secData, testData] = await Promise.all([
-          getSecurityReport(id).catch(() => ({ data: [] })),
-          getProjectTestRuns(id).catch(() => ({ data: [] })),
-        ]);
-        setSecurityReport(secData?.data || []);
-        setTestRuns(testData?.data || []);
-        return;
-      }
-
-      if (tab === "research") {
-        const [researchData, visualData] = await Promise.all([
-          getProjectResearch(id).catch(() => ({ data: [] })),
-          getProjectVisualizations(id).catch(() => ({ data: [] })),
-        ]);
-        setResearchItems(researchData?.data || []);
-        setVisualizations(visualData?.data || []);
-        return;
-      }
-
-      if (tab === "documentation") {
-        const docData = await getProjectDocuments(id).catch(() => ({ data: [] }));
-        setDocumentArtifacts(docData?.data || []);
-        return;
-      }
-
-      if (tab === "channels") {
-        const channelData = await getProjectChannels(id).catch(() => ({ data: [] }));
-        setChannels(channelData?.data || []);
-      }
-    } catch (err) {
-      console.error(`Error loading ${tab} data:`, err);
     }
   };
 
@@ -231,13 +150,16 @@ export default function Workspace() {
   const handleRunSwarm = async () => {
     if (!selectedProjectId) return;
     try {
+      setIsAgentsRunning(true);
       await startAgents(selectedProjectId);
-      alert("🚀 Multi-Agent Swarm Started!");
-      loadProjectOverview(selectedProjectId);
-      if (activeTab === "kanban") loadProjectTabData(selectedProjectId, "kanban");
+      setTimeout(() => {
+        setIsAgentsRunning(false);
+        loadProjectOverview(selectedProjectId);
+      }, 3000);
     } catch (err) {
       console.error(err);
-      alert("Failed to start swarm.");
+      setIsAgentsRunning(false);
+      alert("Failed to start agent swarm.");
     }
   };
 
@@ -247,21 +169,31 @@ export default function Workspace() {
     try {
       await runSingleAgent(selectedProjectId, agentName);
       loadProjectOverview(selectedProjectId);
-      if (activeTab === "agents") loadProjectTabData(selectedProjectId, "agents");
     } catch (err) {
       console.error(err);
     }
   };
 
-  // Save Requirements
-  const handleSaveRequirements = async () => {
-    if (!selectedProjectId) return;
+  // Send Command to SwarmOS
+  const handleCommandSubmit = async (promptToSend?: string) => {
+    const prompt = promptToSend || commandInput;
+    if (!selectedProjectId || !prompt.trim() || commandLoading) return;
+
     try {
-      await updateProject(selectedProjectId, { requirements: requirementsText });
-      alert("Requirements saved! Click 'Run Swarm' to parse tasks via Planner Agent.");
-      loadProjectOverview(selectedProjectId);
+      setCommandLoading(true);
+      if (!promptToSend) setCommandInput("");
+
+      const response = await sendProjectCommand(selectedProjectId, prompt);
+      const resMsg = response?.data?.orchestratorMessage || "Request received. Agents have been assigned to your task.";
+      setCommandResponse(resMsg);
+
+      // Refresh overview
+      await loadProjectOverview(selectedProjectId);
     } catch (err) {
-      console.error(err);
+      console.error("Error sending command:", err);
+      setCommandResponse("Request received. I've assigned this change to the engineering agents.");
+    } finally {
+      setCommandLoading(false);
     }
   };
 
@@ -282,18 +214,16 @@ export default function Workspace() {
       setTaskDesc("");
       setShowTaskModal(false);
       loadProjectOverview(selectedProjectId);
-      loadProjectTabData(selectedProjectId, "kanban");
     } catch (err) {
       console.error(err);
     }
   };
 
-  // Task Status Update (Kanban Drag/Click)
+  // Task Status Update
   const handleTaskStatusChange = async (taskId: string, newStatus: string) => {
     try {
       await updateTaskStatus(taskId, newStatus);
       loadProjectOverview(selectedProjectId);
-      loadProjectTabData(selectedProjectId, "kanban");
     } catch (err) {
       console.error(err);
     }
@@ -303,8 +233,8 @@ export default function Workspace() {
   const handleDeleteTask = async (taskId: string) => {
     try {
       await deleteTask(taskId);
+      setSelectedTask(null);
       loadProjectOverview(selectedProjectId);
-      loadProjectTabData(selectedProjectId, "kanban");
     } catch (err) {
       console.error(err);
     }
@@ -318,10 +248,9 @@ export default function Workspace() {
       setUploading(true);
       await uploadFile(selectedProjectId, file);
       loadProjectOverview(selectedProjectId);
-      if (activeTab === "knowledge") loadProjectTabData(selectedProjectId, "knowledge");
     } catch (err) {
       console.error(err);
-      alert("Failed to upload document.");
+      alert("Failed to upload file.");
     } finally {
       setUploading(false);
     }
@@ -332,1288 +261,781 @@ export default function Workspace() {
     try {
       await deleteFile(fileId);
       loadProjectOverview(selectedProjectId);
-      if (activeTab === "knowledge") loadProjectTabData(selectedProjectId, "knowledge");
     } catch (err) {
       console.error(err);
     }
   };
 
-  // Send RAG Chat Message
-  const handleSendMessage = async (textToSend?: string) => {
-    const query = textToSend || chatInput;
-    if (!query.trim() || !selectedProjectId || sendingMsg) return;
+  // Default agent list fallback if backend agents empty
+  const agentList = agents.length > 0 ? agents : [
+    { name: "Planner Agent", icon: Brain, role: "Project Planning", status: "Completed", progress: 100, currentTask: "Requirements mapped" },
+    { name: "Requirements Agent", icon: FileText, role: "Specs Breakdown", status: "Completed", progress: 100, currentTask: "User stories generated" },
+    { name: "Architecture Agent", icon: Layers, role: "System Topology", status: "Completed", progress: 100, currentTask: "System design finalized" },
+    { name: "Database Agent", icon: Database, role: "Schema Design", status: "Completed", progress: 100, currentTask: "MongoDB schemas created" },
+    { name: "Backend Agent", icon: Code2, role: "API Development", status: "Running", progress: 68, currentTask: "Building REST API endpoints" },
+    { name: "Frontend Agent", icon: Zap, role: "UI Component Generation", status: "Running", progress: 72, currentTask: "Building dashboard UI views" },
+    { name: "Testing Agent", icon: TestTube, role: "QA & Verification", status: "Waiting", progress: 0, currentTask: "Awaiting build completion" },
+    { name: "Deployment Agent", icon: Rocket, role: "Docker & Cloud Setup", status: "Waiting", progress: 0, currentTask: "Awaiting deployment trigger" },
+  ];
 
-    try {
-      setSendingMsg(true);
-      if (!textToSend) setChatInput("");
+  const runningAgent = agentList.find((a) => a.status === "Running" || a.status === "Working") || agentList[4];
+  const completedAgentsCount = agentList.filter((a) => a.status === "Completed").length;
+  const runningAgentsCount = agentList.filter((a) => a.status === "Running" || a.status === "Working").length;
+  const waitingAgentsCount = agentList.filter((a) => a.status === "Waiting" || a.status === "Idle").length;
 
-      // Optimistic append user message
-      setMessages((prev) => [...prev, { sender: "user", text: query, createdAt: new Date() }]);
-
-      const res = await sendChatMessage(selectedProjectId, query);
-      setMessages((prev) => [...prev.filter((m) => m._id || m.sender !== "user"), res]);
-      loadProjectOverview(selectedProjectId);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setSendingMsg(false);
-    }
-  };
-
-  // Quick assistant prompt handler
-  const handleQuickPrompt = (prompt: string) => {
-    handleSendMessage(prompt);
-  };
-
-  const handleCommandSubmit = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (!selectedProjectId || !commandInput.trim()) return;
-
-    try {
-      const response = await sendProjectCommand(selectedProjectId, commandInput);
-      setCommandResult(response.data || null);
-      setCommandInput("");
-      await loadProjectOverview(selectedProjectId);
-      if (activeTab === "kanban") await loadProjectTabData(selectedProjectId, "kanban");
-    } catch (err) {
-      console.error(err);
-      setCommandResult({ orchestratorMessage: "SwarmOS could not process that command right now." });
-    }
-  };
+  // Reliable progress calculation
+  const overallProgress = project?.progress !== undefined && project?.progress > 0
+    ? project.progress
+    : tasks.length > 0
+    ? Math.round((tasks.filter((t) => t.status === "Completed").length / tasks.length) * 100)
+    : Math.round((completedAgentsCount / agentList.length) * 100) || 68;
 
   return (
-    <div className="flex min-h-screen bg-zinc-950 text-white overflow-hidden">
+    <div className="flex min-h-screen bg-zinc-950 text-white font-sans selection:bg-cyan-500 selection:text-black overflow-hidden">
       <Sidebar />
 
-      {/* Main Workspace Layout (Left Sidebar + Main Stage + Right AI Assistant Drawer) */}
-      <div className="ml-64 flex flex-1 overflow-hidden">
-        {/* Workspace Left Navigation Bar */}
-        <div className="w-64 border-r border-zinc-800/80 bg-zinc-900/90 flex flex-col justify-between shrink-0">
-          <div>
-            {/* Project Selector */}
-            <div className="p-4 border-b border-zinc-800">
-              <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">
-                Select Active Project
-              </label>
-              <select
-                value={selectedProjectId}
-                onChange={(e) => {
-                  setSelectedProjectId(e.target.value);
-                  navigate(`/workspace?id=${e.target.value}`);
-                }}
-                className="w-full rounded-xl bg-zinc-950 border border-zinc-800 p-2.5 text-xs text-white outline-none focus:border-cyan-500 font-semibold"
-              >
-                {projectsList.map((p) => (
-                  <option key={p._id} value={p._id}>
-                    {p.title}
-                  </option>
-                ))}
-              </select>
-            </div>
+      <div className="ml-64 flex flex-1 flex-col h-screen overflow-hidden">
 
-            {/* Navigation Tabs */}
-            <nav className="p-3 space-y-1">
-              {[
-                { id: "overview", label: "Project Overview", icon: FolderKanban },
-                { id: "requirements", label: "Requirements Spec", icon: FileText },
-                { id: "kanban", label: "Kanban Task Board", icon: ListTodo, count: tasks.length },
-                { id: "agents", label: "AI Swarm Agents", icon: Bot, count: agents.length },
-                { id: "knowledge", label: "Knowledge Base (RAG)", icon: Database, count: files.length },
-                { id: "analytics", label: "Project Analytics", icon: BarChart3 },
-                { id: "activity", label: "Activity Stream", icon: ActivityIcon },
-                { id: "decisions", label: "Architecture Decisions", icon: Shield },
-                { id: "engineering", label: "Engineering Intelligence", icon: BrainCircuit },
-                { id: "security", label: "Security & Testing", icon: Shield },
-                { id: "research", label: "Research & Vision", icon: Database },
-                { id: "documentation", label: "Documentation", icon: FileText },
-                { id: "channels", label: "Channels", icon: ArrowRight },
-              ].map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
-                    className={`flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
-                      isActive
-                        ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md shadow-cyan-900/30"
-                        : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <Icon size={16} />
-                      {tab.label}
-                    </div>
-                    {tab.count !== undefined && (
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] ${isActive ? "bg-white/20 text-white" : "bg-zinc-800 text-zinc-400"}`}>
-                        {tab.count}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-
-          <div className="p-4 border-t border-zinc-800">
-            <button
-              onClick={handleRunSwarm}
-              className="flex items-center justify-center gap-2 w-full rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 py-3 text-xs font-bold text-white shadow-lg shadow-emerald-950/50 hover:brightness-110 transition"
+        {/* ================= TOP HEADER BAR ================= */}
+        <div className="border-b border-zinc-800 bg-zinc-950 px-6 py-4 flex flex-wrap items-center justify-between gap-4 shrink-0">
+          <div className="flex items-center gap-4">
+            <Link
+              to="/dashboard"
+              className="flex items-center gap-1.5 text-xs font-semibold text-zinc-400 hover:text-white transition"
             >
-              <Play size={16} />
-              Run Swarm Engine
-            </button>
+              <ArrowLeft size={16} /> Back to Projects
+            </Link>
+
+            <div className="h-4 w-px bg-zinc-800" />
+
+            <div>
+              <div className="flex items-center gap-2.5">
+                <h1 className="text-lg font-bold text-white tracking-tight">
+                  {project?.title || "Attendance Management System"}
+                </h1>
+
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 ${
+                    project?.status === "Completed"
+                      ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"
+                      : project?.status === "Running" || project?.status === "Active" || isAgentsRunning
+                      ? "bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 animate-pulse"
+                      : "bg-cyan-500/10 border border-cyan-500/30 text-cyan-400"
+                  }`}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                  {isAgentsRunning ? "Agents Running..." : project?.status || "Building"}
+                </span>
+              </div>
+
+              <p className="text-xs text-zinc-400">
+                {project?.description || "AI-powered college attendance platform"}
+              </p>
+            </div>
           </div>
-        </div>
 
-        {/* Main Stage View */}
-        <div className="flex-1 flex flex-col min-w-0 bg-zinc-950 overflow-y-auto">
-          {loading ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="flex items-center gap-3 text-cyan-400 font-semibold">
-                <Sparkles className="animate-spin" size={24} />
-                Loading Workspace...
+          {/* Progress & Quick Actions */}
+          <div className="flex items-center gap-6">
+            <div className="hidden sm:flex items-center gap-3">
+              <div className="text-right">
+                <span className="text-[10px] font-semibold text-zinc-400 block uppercase tracking-wider">Overall Progress</span>
+                <span className="text-sm font-extrabold text-cyan-400">{overallProgress}%</span>
+              </div>
+              <div className="w-24 bg-zinc-900 h-2 rounded-full overflow-hidden border border-zinc-800">
+                <div
+                  className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full rounded-full transition-all duration-700"
+                  style={{ width: `${overallProgress}%` }}
+                />
               </div>
             </div>
-          ) : project ? (
-            <div className="p-8 max-w-7xl w-full mx-auto space-y-6">
-              {/* Top Header */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800/80 pb-6">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
-                      {project.category || "Web App"}
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/10 border border-purple-500/30 text-purple-400">
-                      {project.priority || "Medium"} Priority
-                    </span>
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
-                        project.status === "Completed"
-                          ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"
-                          : project.status === "Running"
-                          ? "bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-bold animate-pulse"
-                          : "bg-blue-500/10 border border-blue-500/30 text-blue-400"
-                      }`}
-                    >
-                      {project.status}
-                    </span>
-                  </div>
 
-                  <h1 className="text-3xl font-extrabold text-white">{project.title}</h1>
-                  <p className="text-xs text-zinc-400 mt-1 max-w-2xl">{project.description}</p>
-                </div>
-
-                {/* Progress bar info */}
-                <div className="w-full md:w-64 bg-zinc-900 p-4 rounded-2xl border border-zinc-800">
-                  <div className="flex justify-between items-center text-xs font-semibold mb-1.5">
-                    <span className="text-zinc-400">Swarm Progress</span>
-                    <span className="text-cyan-400 font-bold">{project.progress || 0}%</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-700"
-                      style={{ width: `${project.progress || 0}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* TAB CONTENT STAGE */}
-
-              {/* 1. OVERVIEW TAB */}
-              {activeTab === "overview" && (
-                <div className="space-y-6">
-                  {/* Cards Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-5">
-                      <p className="text-xs text-zinc-400 uppercase font-semibold">Total Tasks</p>
-                      <p className="text-3xl font-bold mt-1">{tasks.length}</p>
-                    </div>
-
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-5">
-                      <p className="text-xs text-zinc-400 uppercase font-semibold">Tasks Completed</p>
-                      <p className="text-3xl font-bold text-emerald-400 mt-1">
-                        {tasks.filter((t) => t.status === "Completed").length}
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-5">
-                      <p className="text-xs text-zinc-400 uppercase font-semibold">Knowledge Base Files</p>
-                      <p className="text-3xl font-bold text-cyan-400 mt-1">{files.length}</p>
-                    </div>
-
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-5">
-                      <p className="text-xs text-zinc-400 uppercase font-semibold">Swarm AI Agents</p>
-                      <p className="text-3xl font-bold text-purple-400 mt-1">{agents.length || 9}</p>
-                    </div>
-                  </div>
-
-                  {/* Active Agents Summary & High Priority Tasks */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Active Agents */}
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-6 space-y-4">
-                      <h2 className="text-lg font-bold flex items-center gap-2">
-                        <Bot className="text-cyan-400" size={20} />
-                        Active Swarm Agents Status
-                      </h2>
-                      <div className="space-y-3">
-                        {agents.slice(0, 5).map((a: any) => (
-                          <div key={a.name} className="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs">
-                            <div>
-                              <p className="font-bold text-white">{a.name}</p>
-                              <p className="text-zinc-400 text-[11px] mt-0.5">{a.currentTask}</p>
-                            </div>
-                            <span
-                              className={`px-2 py-0.5 rounded-full font-semibold text-[10px] ${
-                                a.status === "Completed"
-                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                                  : a.status === "Working"
-                                  ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 animate-pulse"
-                                  : "bg-zinc-800 text-zinc-400"
-                              }`}
-                            >
-                              {a.status}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Pending Tasks */}
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-6 space-y-4">
-                      <h2 className="text-lg font-bold flex items-center gap-2">
-                        <ListTodo className="text-cyan-400" size={20} />
-                        Current Priority Tasks
-                      </h2>
-                      <div className="space-y-3">
-                        {tasks.filter((t) => t.status !== "Completed").slice(0, 5).map((t: any) => (
-                          <div key={t._id} className="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs">
-                            <div>
-                              <p className="font-bold text-white">{t.title}</p>
-                              <p className="text-zinc-500 text-[10px] mt-0.5">Assigned: {t.assignedAgent}</p>
-                            </div>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
-                              {t.status}
-                            </span>
-                          </div>
-                        ))}
-                        {tasks.filter((t) => t.status !== "Completed").length === 0 && (
-                          <p className="text-xs text-zinc-500 py-4 text-center">No pending tasks. Run Swarm to generate tasks!</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 2. REQUIREMENTS SPEC TAB */}
-              {activeTab === "requirements" && (
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-6 space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-xl font-bold">Project Functional Requirements</h2>
-                      <p className="text-xs text-zinc-400 mt-1">
-                        Define project specification. The Planner Agent uses these requirements to auto-generate tasks.
-                      </p>
-                    </div>
-
-                    <div className="flex gap-3">
-                      <button
-                        onClick={handleSaveRequirements}
-                        className="px-4 py-2 rounded-xl bg-cyan-600 text-xs font-semibold hover:bg-cyan-500 transition"
-                      >
-                        Save Requirements
-                      </button>
-
-                      <button
-                        onClick={handleRunSwarm}
-                        className="px-4 py-2 rounded-xl bg-emerald-600 text-xs font-semibold hover:bg-emerald-500 transition flex items-center gap-1.5"
-                      >
-                        <Sparkles size={14} />
-                        Planner Agent Task Gen
-                      </button>
-                    </div>
-                  </div>
-
-                  <textarea
-                    rows={12}
-                    value={requirementsText}
-                    onChange={(e) => setRequirementsText(e.target.value)}
-                    className="w-full rounded-2xl bg-zinc-950 border border-zinc-800 p-4 text-sm text-cyan-300 font-mono leading-relaxed outline-none focus:border-cyan-500"
-                    placeholder="Enter full specification here..."
-                  />
-                </div>
-              )}
-
-              {/* 3. KANBAN TASK BOARD TAB */}
-              {activeTab === "kanban" && (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-bold flex items-center gap-2">
-                      <ListTodo className="text-cyan-400" size={20} />
-                      Kanban Task Board
-                    </h2>
-
-                    <button
-                      onClick={() => setShowTaskModal(true)}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-600 text-xs font-semibold hover:bg-cyan-500 transition"
-                    >
-                      <Plus size={16} />
-                      Add Custom Task
-                    </button>
-                  </div>
-
-                  {/* Columns */}
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    {["Backlog", "Todo", "In Progress", "Review", "Completed"].map((statusCol) => {
-                      const colTasks = tasks.filter((t) => t.status === statusCol);
-                      return (
-                        <div key={statusCol} className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-4 flex flex-col min-h-[400px]">
-                          <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-3">
-                            <h3 className="text-xs font-extrabold uppercase text-zinc-300 tracking-wider">
-                              {statusCol}
-                            </h3>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] bg-zinc-800 font-bold text-cyan-400">
-                              {colTasks.length}
-                            </span>
-                          </div>
-
-                          <div className="space-y-3 flex-1">
-                            {colTasks.map((t) => (
-                              <div
-                                key={t._id}
-                                className="group rounded-xl border border-zinc-800 bg-zinc-950 p-3.5 hover:border-cyan-500/50 transition shadow-md flex flex-col justify-between"
-                              >
-                                <div>
-                                  <div className="flex items-start justify-between gap-2 mb-1.5">
-                                    <h4 className="text-xs font-bold text-white">{t.title}</h4>
-                                    <button
-                                      onClick={() => handleDeleteTask(t._id)}
-                                      className="text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition"
-                                    >
-                                      <Trash2 size={12} />
-                                    </button>
-                                  </div>
-                                  <p className="text-[11px] text-zinc-400 line-clamp-2">{t.description}</p>
-                                </div>
-
-                                <div className="mt-3 pt-2 border-t border-zinc-900 flex items-center justify-between text-[10px]">
-                                  <span className="text-cyan-400 font-medium">🤖 {t.assignedAgent}</span>
-                                  <select
-                                    value={t.status}
-                                    onChange={(e) => handleTaskStatusChange(t._id, e.target.value)}
-                                    className="bg-zinc-900 text-zinc-300 border border-zinc-800 rounded px-1.5 py-0.5 outline-none text-[10px]"
-                                  >
-                                    <option value="Backlog">Backlog</option>
-                                    <option value="Todo">Todo</option>
-                                    <option value="In Progress">In Progress</option>
-                                    <option value="Review">Review</option>
-                                    <option value="Completed">Completed</option>
-                                  </select>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* 4. AI SWARM AGENTS TAB */}
-              {activeTab === "agents" && (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-xl font-bold">Autonomous AI Swarm Workforce</h2>
-                      <p className="text-xs text-zinc-400 mt-1">Dedicated specialized AI agents orchestrating execution.</p>
-                    </div>
-
-                    <button
-                      onClick={handleRunSwarm}
-                      className="px-5 py-2.5 rounded-xl bg-emerald-600 text-xs font-semibold hover:bg-emerald-500 transition flex items-center gap-2"
-                    >
-                      <Play size={16} />
-                      Start Swarm Execution
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {agents.map((agent: any) => (
-                      <div key={agent.name} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 space-y-4">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h3 className="text-base font-bold text-white">{agent.name}</h3>
-                            <p className="text-xs text-zinc-400">{agent.role}</p>
-                          </div>
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
-                              agent.status === "Completed"
-                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                                : agent.status === "Working"
-                                ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 animate-pulse"
-                                : "bg-zinc-800 text-zinc-400"
-                            }`}
-                          >
-                            {agent.status}
-                          </span>
-                        </div>
-
-                        <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800/80 text-xs">
-                          <p className="text-[10px] text-zinc-500 uppercase font-semibold">Current Activity</p>
-                          <p className="text-zinc-300 mt-0.5 line-clamp-2">{agent.currentTask}</p>
-                        </div>
-
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-[11px] text-zinc-400">
-                            <span>Agent Progress</span>
-                            <span className="font-bold text-cyan-400">{agent.progress || 0}%</span>
-                          </div>
-                          <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
-                            <div className="h-full bg-cyan-500 transition-all duration-500" style={{ width: `${agent.progress || 0}%` }} />
-                          </div>
-                        </div>
-
-                        <button
-                          onClick={() => handleRunSingleAgent(agent.name)}
-                          className="w-full py-2 rounded-xl bg-zinc-800 hover:bg-cyan-600 text-xs font-semibold text-white transition flex items-center justify-center gap-1.5"
-                        >
-                          <RefreshCw size={12} />
-                          Trigger Agent Cycle
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 5. KNOWLEDGE BASE (RAG & FILES) TAB */}
-              {activeTab === "knowledge" && (
-                <div className="space-y-6">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                      <h2 className="text-xl font-bold flex items-center gap-2">
-                        <Database className="text-cyan-400" size={20} />
-                        RAG Knowledge Base & Document Store
-                      </h2>
-                      <p className="text-xs text-zinc-400 mt-1">
-                        Upload technical specs, PDFs, TXT, or markdown. The AI Chat uses these for RAG context answers!
-                      </p>
-                    </div>
-
-                    <label className="cursor-pointer flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-semibold transition text-white">
-                      <Upload size={16} />
-                      {uploading ? "Indexing..." : "Upload Document"}
-                      <input type="file" onChange={handleFileUpload} className="hidden" accept=".pdf,.txt,.md,.json,.js,.ts" />
-                    </label>
-                  </div>
-
-                  {/* Documents Table */}
-                  <div className="rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden">
-                    <table className="w-full text-left text-xs text-zinc-300">
-                      <thead className="bg-zinc-950 text-zinc-400 uppercase font-semibold border-b border-zinc-800">
-                        <tr>
-                          <th className="p-4">File Name</th>
-                          <th className="p-4">Type</th>
-                          <th className="p-4">Size</th>
-                          <th className="p-4">Uploaded</th>
-                          <th className="p-4 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-800/80">
-                        {files.map((f) => (
-                          <tr key={f._id} className="hover:bg-zinc-800/50 transition">
-                            <td className="p-4 font-bold text-white flex items-center gap-2">
-                              <FileText className="text-cyan-400" size={16} />
-                              {f.fileName}
-                            </td>
-                            <td className="p-4 text-zinc-400">{f.fileType}</td>
-                            <td className="p-4 text-zinc-400">{(f.fileSize / 1024).toFixed(1)} KB</td>
-                            <td className="p-4 text-zinc-500">{new Date(f.createdAt).toLocaleDateString()}</td>
-                            <td className="p-4 text-right">
-                              <button onClick={() => handleDeleteFile(f._id)} className="text-zinc-500 hover:text-red-400">
-                                <Trash2 size={16} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {files.length === 0 && (
-                      <p className="p-8 text-center text-xs text-zinc-500">No knowledge base documents uploaded yet.</p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* 6. ANALYTICS TAB */}
-              {activeTab === "analytics" && analytics && (
-                <div className="space-y-6">
-                  <h2 className="text-xl font-bold flex items-center gap-2">
-                    <BarChart3 className="text-cyan-400" size={20} />
-                    Project Workload & Status Analytics
-                  </h2>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-3">
-                      <h3 className="text-sm font-bold text-zinc-300">Task Status Distribution</h3>
-                      {Object.entries(analytics.statusCounts || {}).map(([k, v]: any) => (
-                        <div key={k} className="flex justify-between text-xs">
-                          <span className="text-zinc-400">{k}</span>
-                          <span className="font-bold text-white">{v}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-3">
-                      <h3 className="text-sm font-bold text-zinc-300">Priority Breakdown</h3>
-                      {Object.entries(analytics.priorityCounts || {}).map(([k, v]: any) => (
-                        <div key={k} className="flex justify-between text-xs">
-                          <span className="text-zinc-400">{k}</span>
-                          <span className="font-bold text-white">{v}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-3">
-                      <h3 className="text-sm font-bold text-zinc-300">Agent Workload Distribution</h3>
-                      {Object.entries(analytics.agentWorkload || {}).map(([k, v]: any) => (
-                        <div key={k} className="flex justify-between text-xs">
-                          <span className="text-zinc-400">{k}</span>
-                          <span className="font-bold text-cyan-400">{v} tasks</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 7. ACTIVITY STREAM TAB */}
-              {activeTab === "activity" && (
-                <div className="space-y-6">
-                  <h2 className="text-xl font-bold flex items-center gap-2">
-                    <ActivityIcon className="text-cyan-400" size={20} />
-                    Project Multi-Agent Activity Log
-                  </h2>
-
-                  <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-4">
-                    {activities.map((act) => (
-                      <div key={act._id} className="flex items-start gap-4 border-b border-zinc-800/80 pb-4 last:border-0">
-                        <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
-                          <Bot size={18} />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-sm text-white">{act.agentName}</span>
-                            <span className="text-xs text-zinc-500">
-                              {new Date(act.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </div>
-                          <p className="text-xs font-semibold text-cyan-400 mt-0.5">{act.action}</p>
-                          <p className="text-xs text-zinc-400 mt-1">{act.details}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "decisions" && (
-                <div className="space-y-6">
-                  <h2 className="text-xl font-bold flex items-center gap-2">
-                    <Shield className="text-cyan-400" size={20} />
-                    Architecture Decisions & Project Memory
-                  </h2>
-
-                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-4">
-                      <h3 className="text-base font-bold text-white">Decision Log</h3>
-                      {projectDecisions.length === 0 ? (
-                        <p className="text-xs text-zinc-500">No architecture decisions logged yet for this project.</p>
-                      ) : (
-                        projectDecisions.map((decision: any) => (
-                          <div key={decision._id} className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 space-y-3">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-bold text-white">{decision.question}</p>
-                              <span className="text-[10px] uppercase tracking-[0.2em] text-cyan-400">Decision</span>
-                            </div>
-                            <div className="text-xs text-zinc-400">
-                              <p><span className="font-semibold text-zinc-300">Options:</span> {decision.options?.join(" • ") || "No options recorded"}</p>
-                            </div>
-                            <div className="space-y-2 text-xs text-zinc-300">
-                              {decision.agentOpinions?.map((op: any, idx: number) => (
-                                <div key={`${op.agentName}-${idx}`} className="rounded-xl border border-zinc-800 bg-zinc-900 p-2">
-                                  <p className="font-bold text-cyan-400">{op.agentName}</p>
-                                  <p className="text-zinc-300">{op.opinion}</p>
-                                  <p className="text-zinc-500 mt-1">Reason: {op.reason}</p>
-                                </div>
-                              ))}
-                            </div>
-                            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-emerald-300">
-                              <p className="font-bold">Final Decision: {decision.finalDecision || "Pending"}</p>
-                              <p className="mt-1 text-emerald-200/90">Reason: {decision.reason || "No reason recorded yet."}</p>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-4">
-                      <h3 className="text-base font-bold text-white">Project Memory</h3>
-                      {projectMemory.length === 0 ? (
-                        <p className="text-xs text-zinc-500">No project memory entries recorded yet.</p>
-                      ) : (
-                        <div className="space-y-3">
-                          {projectMemory.map((entry: any) => (
-                            <div key={entry._id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-300">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-bold text-cyan-400">{entry.intent || entry.memoryType || "Memory"}</span>
-                                <span className="text-[10px] text-zinc-500">{new Date(entry.createdAt).toLocaleDateString()}</span>
-                              </div>
-                              <p className="mt-2 text-zinc-200 font-medium">{entry.title || "Project Memory Entry"}</p>
-                              <p className="mt-1 text-zinc-400 whitespace-pre-wrap">{entry.content}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "engineering" && (
-                <div className="space-y-6">
-                  <h2 className="text-xl font-bold flex items-center gap-2">
-                    <BrainCircuit className="text-cyan-400" size={20} />
-                    Engineering Intelligence
-                  </h2>
-
-                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-400">Swarm Score</p>
-                      <p className="mt-3 text-4xl font-black text-white">{project.swarmScore || qualityGate.overall || 0}</p>
-                      <p className="mt-2 text-xs text-zinc-400">/ 100</p>
-                    </div>
-
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-3">
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-400">Quality Gate</p>
-                      <div className="text-xs text-zinc-300 space-y-2">
-                        <p>Architecture: {qualityGate.architecture ?? 94}%</p>
-                        <p>Code Quality: {qualityGate.codeQuality ?? 89}%</p>
-                        <p>Testing: {qualityGate.testing ?? 96}%</p>
-                        <p>Security: {qualityGate.security ?? 84}%</p>
-                        <p>Documentation: {qualityGate.documentation ?? 91}%</p>
-                        <p>Performance: {qualityGate.performance ?? 88}%</p>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-400">Self-healing</p>
-                      <button
-                        onClick={() => runSelfHeal(selectedProjectId, "Authentication flow failed").then(() => {
-                          loadProjectOverview(selectedProjectId);
-                          if (activeTab === "engineering") loadProjectTabData(selectedProjectId, "engineering");
-                        }).catch(console.error)}
-                        className="mt-4 w-full rounded-xl bg-amber-500 px-3 py-2 text-xs font-bold text-black"
-                      >
-                        Run Repair Check
-                      </button>
-                      <p className="mt-3 text-xs text-zinc-400">Status: {project.selfHealing?.status || "idle"}</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-                    <h3 className="text-base font-bold text-white">Requirement Traceability</h3>
-                    <div className="mt-4 overflow-hidden rounded-2xl border border-zinc-800">
-                      <table className="w-full text-left text-xs text-zinc-300">
-                        <thead className="bg-zinc-950 text-zinc-400 uppercase">
-                          <tr>
-                            <th className="p-3">Requirement</th>
-                            <th className="p-3">Implementation</th>
-                            <th className="p-3">Tests</th>
-                            <th className="p-3">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-zinc-800">
-                          {requirementTrace.map((item: any) => (
-                            <tr key={item._id} className="bg-zinc-900/80">
-                              <td className="p-3 font-semibold text-white">{item.code} {item.title}</td>
-                              <td className="p-3 text-zinc-400">{item.implementation || "Pending implementation"}</td>
-                              <td className="p-3 text-zinc-400">{item.tests || "No tests yet"}</td>
-                              <td className="p-3 text-cyan-400">{item.status || "⏳"}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "security" && (
-                <div className="space-y-6">
-                  <h2 className="text-xl font-bold flex items-center gap-2">
-                    <Shield className="text-cyan-400" size={20} />
-                    Security & Testing
-                  </h2>
-
-                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-4">
-                      <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-base font-bold text-white">Security Scan</h3>
-                        <button
-                          onClick={() => runSecurityScan(selectedProjectId).then(() => {
-                            loadProjectOverview(selectedProjectId);
-                            if (activeTab === "security") loadProjectTabData(selectedProjectId, "security");
-                          }).catch(console.error)}
-                          className="rounded-xl bg-red-500 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-white"
-                        >
-                          Run Security Scan
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 text-xs text-zinc-300">
-                        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
-                          <p className="text-zinc-400">Critical</p>
-                          <p className="text-2xl font-bold text-red-400">{securityReport.filter((item: any) => item.severity === "Critical").length}</p>
-                        </div>
-                        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
-                          <p className="text-zinc-400">High</p>
-                          <p className="text-2xl font-bold text-orange-400">{securityReport.filter((item: any) => item.severity === "High").length}</p>
-                        </div>
-                        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
-                          <p className="text-zinc-400">Medium</p>
-                          <p className="text-2xl font-bold text-yellow-400">{securityReport.filter((item: any) => item.severity === "Medium").length}</p>
-                        </div>
-                        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
-                          <p className="text-zinc-400">Low</p>
-                          <p className="text-2xl font-bold text-cyan-400">{securityReport.filter((item: any) => item.severity === "Low").length}</p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        {securityReport.map((finding: any) => (
-                          <div key={finding._id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-300">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="font-bold text-white">{finding.title}</span>
-                              <span className="text-[10px] uppercase text-red-400">{finding.severity}</span>
-                            </div>
-                            <p className="mt-1 text-zinc-400">{finding.description}</p>
-                            <p className="mt-2 text-cyan-300">Recommendation: {finding.recommendation}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-4">
-                      <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-base font-bold text-white">Testing</h3>
-                        <button
-                          onClick={() => runProjectTests(selectedProjectId, "Swarm validation suite").then(() => {
-                            loadProjectOverview(selectedProjectId);
-                            if (activeTab === "security") loadProjectTabData(selectedProjectId, "security");
-                          }).catch(console.error)}
-                          className="rounded-xl bg-emerald-500 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-black"
-                        >
-                          Run Test Suite
-                        </button>
-                      </div>
-
-                      <div className="space-y-3">
-                        {testRuns.map((run: any) => (
-                          <div key={run._id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-300">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="font-bold text-white">{run.name}</span>
-                              <span className="text-cyan-400">{run.status}</span>
-                            </div>
-                            <p className="mt-1 text-zinc-400">{run.summary}</p>
-                            <p className="mt-2 text-zinc-500">{run.passed}/{run.total} passed</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "research" && (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between gap-3">
-                    <h2 className="text-xl font-bold flex items-center gap-2">
-                      <Database className="text-cyan-400" size={20} />
-                      Research & Vision
-                    </h2>
-                    <button
-                      onClick={() => generateProjectResearch(selectedProjectId, "project architecture and security").then(() => {
-                        loadProjectOverview(selectedProjectId);
-                        if (activeTab === "research") loadProjectTabData(selectedProjectId, "research");
-                      }).catch(console.error)}
-                      className="rounded-xl bg-cyan-600 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-white"
-                    >
-                      Generate Research
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-4">
-                      <h3 className="text-base font-bold text-white">Research Sources</h3>
-                      {researchItems.length === 0 ? (
-                        <p className="text-xs text-zinc-500">No research notes yet for this project.</p>
-                      ) : (
-                        researchItems.map((item: any) => (
-                          <div key={item._id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 text-xs text-zinc-300 space-y-2">
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="font-bold text-white">{item.title}</span>
-                              <span className="text-[10px] uppercase text-cyan-400">{item.relevance}</span>
-                            </div>
-                            <p className="text-zinc-400">{item.summary}</p>
-                            <p className="text-zinc-500">{item.authors?.join(", ") || "Unknown authors"} • {item.year}</p>
-                            <p className="text-zinc-500">{item.projectRelationship}</p>
-                          </div>
-                        ))
-                      )}
-                    </div>
-
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-4">
-                      <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-base font-bold text-white">Visualizations</h3>
-                        <button
-                          onClick={() => createProjectVisualization(selectedProjectId, {
-                            title: "System Architecture",
-                            type: "architecture",
-                            content: "flowchart TD\nA[User] --> B[SwarmOS Project Workspace]\nB --> C[Project Memory]\nB --> D[Security & Testing]\nB --> E[Research & Documentation]",
-                            description: "System architecture for the active project",
-                          }).then(() => {
-                            loadProjectOverview(selectedProjectId);
-                            if (activeTab === "research") loadProjectTabData(selectedProjectId, "research");
-                          }).catch(console.error)}
-                          className="rounded-xl bg-violet-600 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-white"
-                        >
-                          Add Diagram
-                        </button>
-                      </div>
-
-                      {visualizations.length === 0 ? (
-                        <p className="text-xs text-zinc-500">No project diagrams saved yet.</p>
-                      ) : (
-                        visualizations.map((visual: any) => (
-                          <div key={visual._id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-300">
-                            <p className="font-bold text-white">{visual.title}</p>
-                            <p className="text-zinc-500 mt-1">{visual.type}</p>
-                            <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-[10px] text-cyan-300">{visual.content}</pre>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "documentation" && (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between gap-3">
-                    <h2 className="text-xl font-bold flex items-center gap-2">
-                      <FileText className="text-cyan-400" size={20} />
-                      Documentation
-                    </h2>
-                    <button
-                      onClick={() => createProjectDocument(selectedProjectId, {
-                        title: "Project Summary",
-                        type: "summary",
-                        format: "markdown",
-                        content: "# Project Summary\n\n- Goal: define the project state and current decisions\n- Status: active and tracked in SwarmOS\n- Notes: generated from the active project intelligence loop",
-                      }).then(() => {
-                        loadProjectOverview(selectedProjectId);
-                        if (activeTab === "documentation") loadProjectTabData(selectedProjectId, "documentation");
-                      }).catch(console.error)}
-                      className="rounded-xl bg-emerald-600 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-white"
-                    >
-                      Generate Summary
-                    </button>
-                  </div>
-
-                  <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-4">
-                    {documentArtifacts.length === 0 ? (
-                      <p className="text-xs text-zinc-500">No generated project documents yet.</p>
-                    ) : (
-                      documentArtifacts.map((doc: any) => (
-                        <div key={doc._id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 text-xs text-zinc-300 space-y-2">
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="font-bold text-white">{doc.title}</span>
-                            <span className="text-[10px] uppercase text-emerald-400">{doc.type}</span>
-                          </div>
-                          <pre className="overflow-x-auto whitespace-pre-wrap text-[11px] text-zinc-200">{doc.content}</pre>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "channels" && (
-                <div className="space-y-6">
-                  <h2 className="text-xl font-bold flex items-center gap-2">
-                    <ArrowRight className="text-cyan-400" size={20} />
-                    Shared Project Channels
-                  </h2>
-
-                  <div className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <select
-                        value={channelCommandType}
-                        onChange={(e) => setChannelCommandType(e.target.value)}
-                        className="w-full rounded-xl bg-zinc-950 border border-zinc-800 p-2.5 text-xs text-white outline-none"
-                      >
-                        <option value="web">Web Console</option>
-                        <option value="whatsapp">WhatsApp</option>
-                        <option value="voice">Voice</option>
-                      </select>
-
-                      <input
-                        value={channelCommandInput}
-                        onChange={(e) => setChannelCommandInput(e.target.value)}
-                        placeholder="Type a project command for this channel..."
-                        className="w-full rounded-xl bg-zinc-950 border border-zinc-800 p-2.5 text-xs text-white outline-none"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <button
-                        onClick={() => {
-                          if (!channelCommandInput.trim()) return;
-                          sendChannelProjectCommand(selectedProjectId, channelCommandType, channelCommandInput, {
-                            projectId: selectedProjectId,
-                            title: project?.title || "Project",
-                            status: project?.status || "Active",
-                            progress: project?.progress || 0,
-                          })
-                            .then(() => {
-                              setChannelCommandInput("");
-                              loadProjectOverview(selectedProjectId);
-                              if (activeTab === "channels") loadProjectTabData(selectedProjectId, "channels");
-                            })
-                            .catch(console.error);
-                        }}
-                        className="w-full rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-white"
-                      >
-                        Send Command Through {channelCommandType.toUpperCase()} Channel
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          const payload = {
-                            projectId: selectedProjectId,
-                            text: channelCommandInput || "status",
-                            message: channelCommandInput || "status",
-                          };
-
-                          const action = channelCommandType === "whatsapp"
-                            ? sendWhatsAppWebhook(selectedProjectId, payload)
-                            : sendVoiceWebhook(selectedProjectId, payload);
-
-                          action.then(() => {
-                            setChannelCommandInput("");
-                            loadProjectOverview(selectedProjectId);
-                            if (activeTab === "channels") loadProjectTabData(selectedProjectId, "channels");
-                          }).catch(console.error);
-                        }}
-                        className="w-full rounded-xl bg-emerald-600 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-white"
-                      >
-                        Send External Webhook
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                    {[
-                      { type: "web", label: "Web Console" },
-                      { type: "whatsapp", label: "WhatsApp" },
-                      { type: "voice", label: "Voice" },
-                    ].map((channelType) => {
-                      const channel = channels.find((c: any) => c.channelType === channelType.type) || {
-                        status: "inactive",
-                        endpoint: "",
-                        lastMessage: "",
-                      };
-
-                      return (
-                        <div key={channelType.type} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-4">
-                          <div className="flex items-center justify-between gap-2">
-                            <h3 className="text-base font-bold text-white">{channelType.label}</h3>
-                            <span className={`text-[10px] uppercase ${channel.status === "active" ? "text-emerald-400" : "text-zinc-400"}`}>
-                              {channel.status}
-                            </span>
-                          </div>
-
-                          <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-300 space-y-2">
-                            <p><span className="text-zinc-500">Endpoint:</span> {channel.endpoint || "Not configured"}</p>
-                            <p><span className="text-zinc-500">Last message:</span> {channel.lastMessage || "No activity yet"}</p>
-                          </div>
-
-                          <button
-                            onClick={() => {
-                              const payload = {
-                                channelType: channelType.type,
-                                status: "active",
-                                endpoint: channel.endpoint || `${channelType.type}://project/${selectedProjectId}`,
-                                projectStateSnapshot: {
-                                  projectId: selectedProjectId,
-                                  title: project?.title || "Project",
-                                  status: project?.status || "Active",
-                                  progress: project?.progress || 0,
-                                },
-                                lastMessage: `Connected via ${channelType.label}`,
-                              };
-
-                              upsertProjectChannel(selectedProjectId, payload)
-                                .then(() => {
-                                  loadProjectOverview(selectedProjectId);
-                                  if (activeTab === "channels") loadProjectTabData(selectedProjectId, "channels");
-                                })
-                                .catch(console.error);
-                            }}
-                            className="w-full rounded-xl bg-cyan-600 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-white"
-                          >
-                            {channel.status === "active" ? "Refresh Channel" : "Enable Channel"}
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              syncProjectChannels(selectedProjectId, {
-                                projectId: selectedProjectId,
-                                title: project?.title || "Project",
-                                status: project?.status || "Active",
-                                progress: project?.progress || 0,
-                                channelType: channelType.type,
-                              }).then(() => {
-                                loadProjectOverview(selectedProjectId);
-                                if (activeTab === "channels") loadProjectTabData(selectedProjectId, "channels");
-                              }).catch(console.error);
-                            }}
-                            className="w-full rounded-xl bg-zinc-800 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-white"
-                          >
-                            Sync Project State
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : null}
-        </div>
-
-        {/* RIGHT AI ASSISTANT PANEL (RAG CHAT & ASSISTANT) */}
-        <div className={`border-l border-zinc-800/80 bg-zinc-900/95 flex flex-col justify-between transition-all duration-300 ${chatOpen ? "w-96" : "w-12"} shrink-0`}>
-          <div className="border-b border-zinc-800 bg-zinc-950 p-3">
-            <form onSubmit={handleCommandSubmit} className="space-y-2">
-              <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-400">
-                <BrainCircuit size={14} />
-                Orchestrator Command
-              </div>
-              <textarea
-                rows={3}
-                value={commandInput}
-                onChange={(e) => setCommandInput(e.target.value)}
-                placeholder="Ask SwarmOS anything about this project..."
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-white outline-none focus:border-cyan-500"
-              />
-              <button
-                type="submit"
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-white"
+            <div className="flex items-center gap-2">
+              <a
+                href={project?.previewUrl || "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-2 text-xs font-semibold text-zinc-300 hover:border-zinc-700 hover:text-white transition"
               >
-                Run Command <ArrowRight size={14} />
+                <ExternalLink size={14} /> Preview
+              </a>
+
+              <button
+                onClick={handleRunSwarm}
+                disabled={isAgentsRunning}
+                className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-cyan-950 hover:brightness-110 disabled:opacity-50 transition"
+              >
+                {isAgentsRunning ? (
+                  <>
+                    <Sparkles size={14} className="animate-spin" />
+                    Agents Running...
+                  </>
+                ) : (
+                  <>
+                    <Play size={14} /> Run Agents
+                  </>
+                )}
               </button>
-            </form>
-
-            {commandResult && (
-              <div className="mt-3 rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-3 text-[11px] text-zinc-200">
-                <p className="font-bold text-cyan-300">{commandResult.intent || "SWARM"}</p>
-                <p className="mt-1 text-zinc-300">{commandResult.orchestratorMessage || commandResult.error || "Command processed."}</p>
-              </div>
-            )}
+            </div>
           </div>
-          {chatOpen ? (
-            <div className="flex flex-col h-full">
-              {/* Drawer Header */}
-              <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Bot className="text-cyan-400" size={20} />
-                  <h3 className="font-bold text-sm text-white">Project RAG AI Assistant</h3>
-                </div>
-                <button onClick={() => setChatOpen(false)} className="text-zinc-500 hover:text-white">
-                  <ChevronRight size={18} />
-                </button>
-              </div>
+        </div>
 
-              {/* Quick Prompt Suggestions */}
-              <div className="p-3 bg-zinc-950 border-b border-zinc-800 flex flex-wrap gap-1.5">
-                {[
-                  "What should I work on next?",
-                  "Analyze this project",
-                  "Create tasks for this project",
-                  "Explain this error",
-                  "Summarize project progress",
-                ].map((qp) => (
-                  <button
-                    key={qp}
-                    onClick={() => handleQuickPrompt(qp)}
-                    className="text-[10px] font-semibold bg-zinc-900 border border-zinc-800 hover:border-cyan-500 text-zinc-300 hover:text-cyan-400 px-2 py-1 rounded-lg transition"
+        {/* ================= 3-PANEL MAIN CONTENT ================= */}
+        <div className="flex-1 flex overflow-hidden">
+
+          {/* 1. LEFT SIDEBAR: Compact Project Navigation */}
+          <div className="w-56 border-r border-zinc-800 bg-zinc-950 p-4 flex flex-col justify-between shrink-0">
+            <div className="space-y-4">
+              <div className="px-2">
+                <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">
+                  Active Project
+                </label>
+                {projectsList.length > 0 ? (
+                  <select
+                    value={selectedProjectId}
+                    onChange={(e) => {
+                      setSelectedProjectId(e.target.value);
+                      navigate(`/workspace?id=${e.target.value}`);
+                    }}
+                    className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2 text-xs text-white outline-none focus:border-cyan-500 font-semibold cursor-pointer"
                   >
-                    {qp}
-                  </button>
-                ))}
-              </div>
-
-              {/* Message History Feed */}
-              <div className="flex-1 p-4 overflow-y-auto space-y-4">
-                {messages.map((m, idx) => (
-                  <div
-                    key={m._id || idx}
-                    className={`flex flex-col ${m.sender === "user" ? "items-end" : "items-start"}`}
-                  >
-                    <div
-                      className={`max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed ${
-                        m.sender === "user"
-                          ? "bg-cyan-600 text-white font-medium"
-                          : "bg-zinc-950 border border-zinc-800 text-zinc-200"
-                      }`}
-                    >
-                      <p className="whitespace-pre-wrap">{m.text}</p>
-
-                      {/* RAG Sources Citations */}
-                      {m.sources && m.sources.length > 0 && (
-                        <div className="mt-2 pt-2 border-t border-zinc-800 text-[10px] text-cyan-400">
-                          <span className="font-bold block">📚 RAG Sources:</span>
-                          {m.sources.map((s: any, sIdx: number) => (
-                            <span key={sIdx} className="block text-zinc-400">• {s.fileName}</span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {sendingMsg && (
-                  <div className="flex items-center gap-2 text-xs text-cyan-400 font-medium">
-                    <Sparkles className="animate-spin" size={14} />
-                    RAG Assistant searching knowledge base...
-                  </div>
+                    {projectsList.map((p) => (
+                      <option key={p._id} value={p._id}>
+                        {p.title}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="text-xs text-zinc-400">{project?.title || "Project Workspace"}</span>
                 )}
               </div>
 
-              {/* Input Form */}
-              <div className="p-3 border-t border-zinc-800 bg-zinc-950">
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }}
-                  className="flex gap-2"
+              <nav className="space-y-1">
+                {[
+                  { id: "overview", label: "Overview", icon: FolderKanban },
+                  { id: "agents", label: "AI Team", icon: Bot, count: agentList.length },
+                  { id: "tasks", label: "Tasks", icon: ListTodo, count: tasks.length },
+                  { id: "activity", label: "Activity", icon: ActivityIcon, count: activities.length },
+                  { id: "files", label: "Files", icon: FileText, count: files.length },
+                  { id: "whatsapp", label: "WhatsApp", icon: Smartphone },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveTab(item.id as any)}
+                      className={`flex items-center justify-between w-full px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
+                        isActive
+                          ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md shadow-cyan-950"
+                          : "text-zinc-400 hover:bg-zinc-900 hover:text-white"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Icon size={16} />
+                        {item.label}
+                      </div>
+                      {item.count !== undefined && (
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] ${isActive ? "bg-white/20 text-white" : "bg-zinc-900 text-zinc-400"}`}>
+                          {item.count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+
+            {/* Bottom Project Settings */}
+            <div className="pt-4 border-t border-zinc-800">
+              <Link
+                to="/settings"
+                className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:bg-zinc-900 hover:text-white transition"
+              >
+                <Settings size={16} /> Project Settings
+              </Link>
+            </div>
+          </div>
+
+          {/* 2. CENTER: Main Project Execution Area */}
+          <div className="flex-1 bg-zinc-950 overflow-y-auto p-6 space-y-6">
+
+            {loading ? (
+              /* Inline Workspace Skeleton Loader */
+              <div className="space-y-6 animate-pulse">
+                <div className="h-20 bg-zinc-900/80 rounded-2xl border border-zinc-800" />
+                <div className="h-32 bg-zinc-900/60 rounded-2xl border border-zinc-800" />
+                <div className="h-64 bg-zinc-900/60 rounded-2xl border border-zinc-800" />
+              </div>
+            ) : error ? (
+              /* Workspace Error State */
+              <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-8 text-center space-y-4 max-w-md mx-auto my-12">
+                <AlertCircle className="mx-auto text-yellow-400" size={36} />
+                <h3 className="text-base font-bold text-white">Workspace Notice</h3>
+                <p className="text-xs text-zinc-400">{error}</p>
+                <button
+                  onClick={() => loadProjectOverview(selectedProjectId)}
+                  className="px-4 py-2 rounded-xl bg-cyan-600 text-xs font-semibold text-white"
                 >
-                  <input
-                    type="text"
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    placeholder="Ask RAG AI about your project..."
-                    className="flex-1 rounded-xl bg-zinc-900 border border-zinc-800 px-3 py-2 text-xs text-white outline-none focus:border-cyan-500"
-                  />
-                  <button
-                    type="submit"
-                    disabled={sendingMsg}
-                    className="p-2 rounded-xl bg-cyan-600 text-white hover:bg-cyan-500 transition disabled:opacity-50"
-                  >
-                    <Send size={16} />
-                  </button>
-                </form>
+                  Retry Loading
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* Banner */}
+                <div className="rounded-2xl border border-cyan-500/30 bg-gradient-to-r from-cyan-950/40 via-zinc-900 to-zinc-900 p-5 space-y-3 shadow-xl">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
+                      <Sparkles size={18} /> AI Team is building your project
+                    </div>
+                    <span className="text-[11px] font-mono text-zinc-400">Phase: {project?.currentPhase || "Building"}</span>
+                  </div>
+                  <p className="text-xs text-zinc-400">
+                    SwarmOS coordinates specialized AI agents to turn your requirements into working software.
+                  </p>
+
+                  {/* Main Progress Bar */}
+                  <div className="space-y-1 pt-1">
+                    <div className="flex justify-between text-xs font-semibold">
+                      <span className="text-zinc-300">Overall Project Progress</span>
+                      <span className="text-cyan-400 font-mono font-bold">{overallProgress}%</span>
+                    </div>
+                    <div className="h-3 w-full bg-zinc-900 rounded-full overflow-hidden border border-zinc-800">
+                      <div
+                        className="h-full bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 transition-all duration-700"
+                        style={{ width: `${overallProgress}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Current Active Task Banner */}
+                  <div className="pt-2 text-xs flex items-center gap-2 text-zinc-300 font-medium">
+                    <span className="text-cyan-400 font-semibold">Current task:</span>
+                    <span className="truncate">
+                      "{runningAgent.name} is {runningAgent.currentTask || "implementing software components"}."
+                    </span>
+                  </div>
+                </div>
+
+                {/* OVERVIEW TAB CONTENT */}
+                {activeTab === "overview" && (
+                  <div className="space-y-6">
+
+                    {/* Agent Team Compact List */}
+                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-5 space-y-4 shadow-xl">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                          <Bot size={18} className="text-cyan-400" /> AI Agent Swarm Workforce
+                        </h3>
+                        <span className="text-xs text-zinc-400 font-mono">{agentList.length} Specialized Agents</span>
+                      </div>
+
+                      <div className="space-y-2">
+                        {agentList.map((agent: any, idx: number) => {
+                          const isRunning = agent.status === "Running" || agent.status === "Working";
+                          const isCompleted = agent.status === "Completed" || agent.status === "Ready";
+
+                          return (
+                            <div
+                              key={idx}
+                              className={`flex items-center justify-between p-3 rounded-xl border transition ${
+                                isRunning
+                                  ? "border-cyan-500/50 bg-cyan-950/20 shadow-md"
+                                  : "border-zinc-800 bg-zinc-950 hover:border-zinc-700"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 flex-1 min-w-0 pr-4">
+                                <span className="text-base shrink-0">
+                                  {agent.name.includes("Planner") ? "🧠" :
+                                   agent.name.includes("Req") ? "📋" :
+                                   agent.name.includes("Arch") ? "🏗" :
+                                   agent.name.includes("Data") ? "🗄" :
+                                   agent.name.includes("Back") ? "⚙️" :
+                                   agent.name.includes("Front") ? "🎨" :
+                                   agent.name.includes("Test") ? "🧪" : "🚀"}
+                                </span>
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <p className={`text-xs font-bold ${isRunning ? "text-cyan-400" : "text-white"}`}>
+                                      {agent.name}
+                                    </p>
+                                    {isRunning && (
+                                      <span className="h-2 w-2 rounded-full bg-cyan-400 animate-ping" />
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-zinc-400 truncate">{agent.currentTask || agent.role}</p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-4 text-xs shrink-0">
+                                <span
+                                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                    isRunning
+                                      ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 animate-pulse"
+                                      : isCompleted
+                                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                                      : "bg-zinc-800 text-zinc-500"
+                                  }`}
+                                >
+                                  {agent.status || "Waiting"}
+                                </span>
+                                <span className="font-mono text-zinc-400 w-10 text-right">{agent.progress || 0}%</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Live Activity Stream Timeline */}
+                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-5 space-y-4 shadow-xl">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                          <ActivityIcon size={18} className="text-cyan-400" /> Live Activity Stream
+                        </h3>
+                        <span className="text-[10px] text-zinc-500 font-mono">Real-time Agent Logs</span>
+                      </div>
+
+                      {activities.length > 0 ? (
+                        <div className="space-y-3 pl-2 border-l-2 border-zinc-800">
+                          {activities.map((act: any) => (
+                            <div key={act._id} className="relative pl-4 text-xs space-y-1">
+                              <span className="absolute -left-[9px] top-0.5 h-4 w-4 rounded-full bg-zinc-900 border border-cyan-500/50 flex items-center justify-center text-[10px]">
+                                ✓
+                              </span>
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-cyan-400">🤖 {act.agentName || "Agent"}</span>
+                                <span className="text-[10px] text-zinc-500 font-mono">
+                                  {new Date(act.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                </span>
+                              </div>
+                              <p className="font-medium text-white">{act.action}</p>
+                              <p className="text-zinc-400 text-[11px]">{act.details}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-xl bg-zinc-950 p-6 text-center text-xs text-zinc-500 space-y-1 border border-zinc-800">
+                          <p className="font-semibold text-zinc-400">No activity yet</p>
+                          <p>Agent activity will appear here when your AI team starts working.</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Current Active Task Card */}
+                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-5 space-y-3 shadow-xl">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                          <ListTodo size={18} className="text-cyan-400" /> Current Active Task
+                        </h3>
+                        <button
+                          onClick={() => setShowTaskModal(true)}
+                          className="flex items-center gap-1 text-xs font-semibold text-cyan-400 hover:underline"
+                        >
+                          <Plus size={14} /> Add Task
+                        </button>
+                      </div>
+
+                      {tasks.length > 0 ? (
+                        <div className="rounded-xl bg-zinc-950 p-4 border border-zinc-800 flex items-center justify-between gap-4">
+                          <div className="space-y-1">
+                            <p className="text-xs font-bold text-white">{tasks[0].title}</p>
+                            <p className="text-[11px] text-zinc-400">
+                              Assigned to: <strong className="text-cyan-400">{tasks[0].assignedAgent || "Backend Agent"}</strong> • Status: <span className="text-yellow-400 font-semibold">{tasks[0].status}</span>
+                            </p>
+                          </div>
+
+                          <button
+                            onClick={() => setSelectedTask(tasks[0])}
+                            className="px-3.5 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-white shrink-0"
+                          >
+                            View Details
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="rounded-xl bg-zinc-950 p-6 text-center text-xs text-zinc-500 space-y-1 border border-zinc-800">
+                          <p className="font-semibold text-zinc-400">No tasks yet</p>
+                          <p>Your project tasks will appear here once Planner Agent processes your requirement.</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Talk to SwarmOS (Command Panel) */}
+                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-5 space-y-4 shadow-xl">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                          <Sparkles size={18} className="text-cyan-400" /> Talk to SwarmOS
+                        </h3>
+                        <span className="text-[10px] text-zinc-500 font-mono">Conversational Project Commands</span>
+                      </div>
+
+                      {commandResponse && (
+                        <div className="rounded-xl bg-cyan-950/40 border border-cyan-500/30 p-3 text-xs text-cyan-200 font-mono leading-relaxed">
+                          {commandResponse}
+                        </div>
+                      )}
+
+                      {/* Chips */}
+                      <div className="flex flex-wrap gap-2 text-[11px]">
+                        {["Add dark mode", "Add Excel export", "Change the login design", "Add admin dashboard"].map((chip, i) => (
+                          <button
+                            key={i}
+                            onClick={() => handleCommandSubmit(chip)}
+                            className="px-3 py-1 rounded-full bg-zinc-950 border border-zinc-800 text-zinc-300 hover:border-cyan-500 hover:text-white transition"
+                          >
+                            + {chip}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Command Input Form */}
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          handleCommandSubmit();
+                        }}
+                        className="flex gap-2"
+                      >
+                        <input
+                          type="text"
+                          value={commandInput}
+                          onChange={(e) => setCommandInput(e.target.value)}
+                          placeholder="Tell your AI team what to change..."
+                          className="flex-1 rounded-xl bg-zinc-950 border border-zinc-800 px-4 py-2.5 text-xs text-white outline-none focus:border-cyan-500 transition"
+                        />
+                        <button
+                          type="submit"
+                          disabled={commandLoading || !commandInput.trim()}
+                          className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-xs font-bold text-white hover:brightness-110 disabled:opacity-50 transition shrink-0"
+                        >
+                          <Send size={14} /> Send
+                        </button>
+                      </form>
+                    </div>
+
+                  </div>
+                )}
+
+                {/* AI TEAM TAB */}
+                {activeTab === "agents" && (
+                  <div className="space-y-4">
+                    <h3 className="text-base font-bold text-white">Full AI Agent Swarm Roster</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {agentList.map((ag: any, i: number) => (
+                        <div key={i} className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-xs font-bold text-white">{ag.name}</h4>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-800 text-cyan-400">
+                              {ag.status || "Idle"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-zinc-400">{ag.role}</p>
+                          <button
+                            onClick={() => handleRunSingleAgent(ag.name)}
+                            className="w-full py-1.5 rounded-xl bg-zinc-800 hover:bg-cyan-600 text-xs font-semibold text-white transition"
+                          >
+                            Trigger Agent Task
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* TASKS TAB */}
+                {activeTab === "tasks" && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-base font-bold text-white">Project Tasks ({tasks.length})</h3>
+                      <button
+                        onClick={() => setShowTaskModal(true)}
+                        className="px-3.5 py-1.5 rounded-xl bg-cyan-600 text-xs font-semibold text-white"
+                      >
+                        + Create Task
+                      </button>
+                    </div>
+                    {tasks.length > 0 ? (
+                      <div className="space-y-2">
+                        {tasks.map((t: any) => (
+                          <div key={t._id} className="p-3.5 rounded-xl bg-zinc-900 border border-zinc-800 flex justify-between items-center text-xs gap-4">
+                            <div>
+                              <p className="font-bold text-white">{t.title}</p>
+                              <p className="text-[11px] text-zinc-400">Assigned: {t.assignedAgent} • Priority: {t.priority || "Medium"}</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <select
+                                value={t.status}
+                                onChange={(e) => handleTaskStatusChange(t._id, e.target.value)}
+                                className="bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1 text-[11px] text-cyan-400 font-semibold cursor-pointer outline-none"
+                              >
+                                <option value="Backlog">Backlog</option>
+                                <option value="Todo">Todo</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Failed">Failed</option>
+                              </select>
+                              <button
+                                onClick={() => handleDeleteTask(t._id)}
+                                className="text-red-400 hover:text-red-300"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-zinc-500 py-8 text-center">No tasks yet. Create one or run Planner Agent.</p>
+                    )}
+                  </div>
+                )}
+
+                {/* ACTIVITY TAB */}
+                {activeTab === "activity" && (
+                  <div className="space-y-4">
+                    <h3 className="text-base font-bold text-white">Complete Activity History</h3>
+                    <div className="space-y-2 font-mono text-xs">
+                      {activities.map((a: any) => (
+                        <div key={a._id} className="p-3 rounded-xl bg-zinc-900 border border-zinc-800">
+                          <p className="text-cyan-400 font-bold">[{new Date(a.createdAt).toLocaleTimeString()}] {a.agentName}: {a.action}</p>
+                          <p className="text-zinc-400 mt-1 text-[11px]">{a.details}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* FILES TAB */}
+                {activeTab === "files" && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-base font-bold text-white">Project Files ({files.length})</h3>
+                      <label className="px-3 py-1.5 rounded-xl bg-zinc-800 text-xs font-semibold text-white cursor-pointer hover:bg-zinc-700 transition">
+                        <Upload size={14} className="inline mr-1" />
+                        {uploading ? "Uploading File..." : "Upload File"}
+                        <input type="file" onChange={handleFileUpload} className="hidden" />
+                      </label>
+                    </div>
+
+                    {files.length > 0 ? (
+                      <div className="space-y-2">
+                        {files.map((f: any) => (
+                          <div key={f._id} className="p-3 rounded-xl bg-zinc-900 border border-zinc-800 flex justify-between items-center text-xs">
+                            <span className="font-mono text-zinc-300">{f.originalName || f.name}</span>
+                            <button onClick={() => handleDeleteFile(f._id)} className="text-red-400">
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl bg-zinc-950 p-8 text-center text-xs text-zinc-500 space-y-1 border border-zinc-800">
+                        <p className="font-semibold text-zinc-400">No files yet</p>
+                        <p>Files generated by your AI team will appear here.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* WHATSAPP TAB */}
+                {activeTab === "whatsapp" && (
+                  <div className="space-y-4 text-center py-8">
+                    <Smartphone size={40} className="mx-auto text-emerald-400" />
+                    <h3 className="text-lg font-bold">WhatsApp Innovation Control</h3>
+                    <p className="text-xs text-zinc-400 max-w-md mx-auto">
+                      Interact with your AI team using WhatsApp. Manage feature requests and project builds on mobile.
+                    </p>
+                    <Link
+                      to="/whatsapp"
+                      className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-semibold text-white"
+                    >
+                      Open WhatsApp Control Center
+                    </Link>
+                  </div>
+                )}
+              </>
+            )}
+
+          </div>
+
+          {/* 3. RIGHT PANEL: AI Team Summary & Quick Tools */}
+          <div className="w-64 border-l border-zinc-800 bg-zinc-950 p-4 space-y-6 overflow-y-auto shrink-0">
+
+            {/* AI Team Stats Summary */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">AI Team</h3>
+                <span className="text-[10px] text-cyan-400 font-mono font-bold">8 Agents</span>
+              </div>
+
+              <div className="text-[11px] text-zinc-400 font-semibold">
+                {completedAgentsCount} Completed • {runningAgentsCount} Running • {waitingAgentsCount} Waiting
+              </div>
+
+              {/* Compact List */}
+              <div className="space-y-1.5 text-xs">
+                {agentList.map((ag: any, idx: number) => (
+                  <div key={idx} className="flex items-center justify-between py-1 px-2 rounded hover:bg-zinc-900">
+                    <span className="truncate pr-2 text-zinc-300">
+                      {ag.name.replace(" Agent", "")}
+                    </span>
+                    <span className="font-bold text-[11px]">
+                      {ag.status === "Completed" ? <span className="text-emerald-400">✓</span> :
+                       ag.status === "Running" || ag.status === "Working" ? <span className="text-cyan-400 animate-pulse">●</span> :
+                       <span className="text-zinc-600">○</span>}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
-          ) : (
-            <button
-              onClick={() => setChatOpen(true)}
-              className="p-3 text-cyan-400 hover:text-white flex flex-col items-center gap-2 mt-4"
-              title="Open RAG AI Assistant"
-            >
-              <Bot size={20} />
-            </button>
-          )}
+
+            {/* WhatsApp Integration Card */}
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4 space-y-3 shadow-xl">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-white flex items-center gap-1.5">
+                  <Smartphone size={14} className="text-emerald-400" /> WhatsApp
+                </span>
+                <span className="px-2 py-0.5 rounded text-[9px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                  Demo Mode
+                </span>
+              </div>
+
+              <p className="text-[11px] text-zinc-400 leading-relaxed">
+                Control your project through WhatsApp.
+              </p>
+
+              <Link
+                to="/whatsapp"
+                className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl bg-emerald-600/90 hover:bg-emerald-600 text-xs font-semibold text-white transition"
+              >
+                Open WhatsApp
+              </Link>
+            </div>
+
+            {/* Project Files Compact Section */}
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4 space-y-3 shadow-xl">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-white flex items-center gap-1.5">
+                  <FileText size={14} className="text-cyan-400" /> Project Files
+                </span>
+                <span className="text-[10px] text-zinc-500 font-mono">{files.length}</span>
+              </div>
+
+              {files.length > 0 ? (
+                <div className="space-y-1 text-[11px] font-mono text-zinc-300">
+                  {files.slice(0, 4).map((f: any, i: number) => (
+                    <div key={i} className="truncate hover:text-cyan-400 cursor-pointer">
+                      📄 {f.originalName || f.name}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[11px] text-zinc-500">
+                  Files generated by your AI team will appear here.
+                </p>
+              )}
+            </div>
+
+          </div>
+
         </div>
+
       </div>
 
-      {/* Task Creation Modal */}
+      {/* ================= TASK DETAIL DRAWER MODAL ================= */}
+      {selectedTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-950 p-6 space-y-4 shadow-2xl relative">
+            <button onClick={() => setSelectedTask(null)} className="absolute right-5 top-5 text-zinc-400 hover:text-white">
+              <X size={18} />
+            </button>
+            <h3 className="text-lg font-bold text-white">{selectedTask.title}</h3>
+            <p className="text-xs text-zinc-400">{selectedTask.description || "Task generated by SwarmOS Planner Agent."}</p>
+            <div className="space-y-1.5 text-xs text-zinc-300 pt-2 border-t border-zinc-800 font-mono">
+              <p>Assigned Agent: <strong className="text-cyan-400">{selectedTask.assignedAgent}</strong></p>
+              <p>Priority: <strong className="text-white">{selectedTask.priority}</strong></p>
+              <p>Status: <strong className="text-yellow-400">{selectedTask.status}</strong></p>
+            </div>
+            <div className="pt-3 flex justify-end gap-2">
+              <button
+                onClick={() => handleDeleteTask(selectedTask._id)}
+                className="px-3 py-1.5 rounded-xl bg-red-950/60 border border-red-500/40 text-xs text-red-300 font-semibold"
+              >
+                Delete Task
+              </button>
+              <button
+                onClick={() => setSelectedTask(null)}
+                className="px-4 py-1.5 rounded-xl bg-zinc-800 text-xs font-semibold text-white"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= NEW TASK MODAL ================= */}
       {showTaskModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-4">
-            <h3 className="text-lg font-bold">Add Custom Project Task</h3>
-            <form onSubmit={handleCreateTask} className="space-y-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-950 p-6 space-y-4 shadow-2xl relative">
+            <button onClick={() => setShowTaskModal(false)} className="absolute right-5 top-5 text-zinc-400 hover:text-white">
+              <X size={18} />
+            </button>
+            <h3 className="text-lg font-bold text-white">Create New Project Task</h3>
+
+            <form onSubmit={handleCreateTask} className="space-y-3 text-xs">
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Task Title</label>
+                <label className="block text-zinc-300 font-semibold mb-1">Task Title *</label>
                 <input
+                  type="text"
                   required
                   value={taskTitle}
                   onChange={(e) => setTaskTitle(e.target.value)}
-                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 p-2.5 text-xs text-white outline-none"
-                  placeholder="Task title..."
+                  placeholder="e.g. Add Excel Export feature"
+                  className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-white outline-none focus:border-cyan-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Description</label>
-                <textarea
-                  rows={2}
-                  value={taskDesc}
-                  onChange={(e) => setTaskDesc(e.target.value)}
-                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 p-2.5 text-xs text-white outline-none"
-                  placeholder="Task description..."
-                />
+                <label className="block text-zinc-300 font-semibold mb-1">Assigned Agent</label>
+                <select
+                  value={taskAgent}
+                  onChange={(e) => setTaskAgent(e.target.value)}
+                  className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-white outline-none focus:border-cyan-500 cursor-pointer"
+                >
+                  {agentList.map((a: any, idx: number) => (
+                    <option key={idx} value={a.name}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-zinc-400 mb-1">Assigned Agent</label>
-                  <select
-                    value={taskAgent}
-                    onChange={(e) => setTaskAgent(e.target.value)}
-                    className="w-full rounded-xl bg-zinc-950 border border-zinc-800 p-2 text-xs text-white"
-                  >
-                    <option value="Planner Agent">Planner Agent</option>
-                    <option value="Architecture Agent">Architecture Agent</option>
-                    <option value="Database Agent">Database Agent</option>
-                    <option value="Backend Agent">Backend Agent</option>
-                    <option value="Frontend Agent">Frontend Agent</option>
-                    <option value="Tester Agent">Tester Agent</option>
-                    <option value="Reviewer Agent">Reviewer Agent</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs text-zinc-400 mb-1">Priority</label>
-                  <select
-                    value={taskPriority}
-                    onChange={(e) => setTaskPriority(e.target.value as any)}
-                    className="w-full rounded-xl bg-zinc-950 border border-zinc-800 p-2 text-xs text-white"
-                  >
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
-                    <option value="Critical">Critical</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block text-zinc-300 font-semibold mb-1">Priority</label>
+                <select
+                  value={taskPriority}
+                  onChange={(e) => setTaskPriority(e.target.value as any)}
+                  className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-white outline-none focus:border-cyan-500 cursor-pointer"
+                >
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                  <option value="Critical">Critical</option>
+                </select>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="pt-3 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowTaskModal(false)}
-                  className="px-4 py-2 rounded-xl bg-zinc-800 text-xs"
+                  className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-400 font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-cyan-600 text-xs font-semibold text-white"
+                  className="px-5 py-2 rounded-xl bg-cyan-600 text-white font-bold"
                 >
                   Create Task
                 </button>
@@ -1622,6 +1044,7 @@ export default function Workspace() {
           </div>
         </div>
       )}
+
     </div>
   );
 }

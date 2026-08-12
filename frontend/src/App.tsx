@@ -6,6 +6,7 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Workspace from "./pages/Workspace";
 import Projects from "./pages/Projects";
+import WhatsAppPage from "./pages/WhatsAppPage";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 
@@ -41,6 +42,15 @@ function App() {
         element={
           <ProtectedRoute>
             <Projects />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/whatsapp"
+        element={
+          <ProtectedRoute>
+            <WhatsAppPage />
           </ProtectedRoute>
         }
       />
