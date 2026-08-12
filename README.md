@@ -2,122 +2,224 @@
 
 > **AI Agent Teams for Building Software from Ideas to Deployment.**
 
-SwarmOS is an AI-powered multi-agent software development platform where specialized AI agents collaborate synchronously to transform natural-language software ideas into structured, full-stack software projects.
+SwarmOS is an AI-powered multi-agent software development platform that coordinates specialized AI agents to transform software ideas into structured, buildable, and continuously evolving projects.
 
-Instead of relying on a single general-purpose chatbot, SwarmOS models software engineering as a coordinated effort between specialized AI agents—spanning planning, architecture, backend API creation, frontend UI generation, database design, testing, and deployment.
-
----
-
-## 💡 The Problem
-
-Building modern software applications requires coordinating multiple disciplines:
-
-- 📋 **Requirements Engineering** & Task Specs
-- 🏗 **System Architecture** & Microservice Topology
-- 🎨 **Frontend UI/UX Design**
-- ⚙️ **Backend REST APIs** & Middleware
-- 🗄 **Database Schemas** & Relational Models
-- 🧪 **Quality Assurance**, Security & Vulnerability Scans
-- 🚀 **Build & Cloud Deployment**
-
-For students, beginners, startups, and small engineering teams, managing all these phases simultaneously can be overwhelming and time-consuming. Traditional AI coding assistants operate primarily as single-file conversational code generators. 
-
-**SwarmOS explores a different paradigm**: An autonomous AI engineering swarm with specialized responsibilities collaborating on the same codebase.
+Designed around the paradigm of a collaborative **AI engineering team** rather than a single chatbot assistant, SwarmOS coordinates specialized roles across planning, requirements, architecture, database design, backend engineering, frontend generation, testing, and deployment.
 
 ---
 
-## 🎯 Our Solution
+## 🚀 Vision
+
+SwarmOS aims to make software development accessible, structured, and observable by enabling users to express product vision in natural language while an autonomous AI swarm coordinates execution across every phase of the engineering lifecycle.
 
 ```mermaid
 flowchart TD
-    Idea["💡 User Software Idea"] --> Planner["🧠 Planner Agent"]
-    Planner --> Req["📋 Requirements Agent"]
-    Req --> Arch["🏗 Architecture Agent"]
-    Arch --> DB["🗄 Database Agent"]
-    DB --> Backend["⚙️ Backend Agent"]
-    Backend --> Frontend["🎨 Frontend Agent"]
-    Frontend --> Testing["🧪 Testing Agent"]
-    Testing --> Deploy["🚀 Deployment Agent"]
-    Deploy --> Software["✨ Deployed Software Project"]
+    Human["👤 Human Project Owner"] --> Idea["💡 Project Idea"]
+    Idea --> Planning["🧠 AI Planning & Decomposition"]
+    Planning --> Swarm["🤖 Specialized AI Agents"]
+    Swarm --> Software["⚙️ Full-Stack Software Project"]
+    Software --> Testing["🧪 Quality & Verification"]
+    Testing --> Improvement["🔄 Continuous Improvement & Iteration"]
+    Improvement -. Feedback Loop .-> Human
 ```
 
-Each agent handles a specific phase of the software development lifecycle. Users can monitor progress, inspect generated tasks, and steer the project interactively from the developer workspace or via mobile WhatsApp interaction.
+SwarmOS keeps **humans in control** as product architects, while specialized AI agents perform domain-specific engineering work.
 
 ---
 
-## 🚀 What Makes SwarmOS Different?
+## ⚡ The Problem
 
-### 1. AI Agent Team
-Instead of one generic AI assistant attempting to do everything, SwarmOS dispatches specialized AI roles with domain-focused responsibilities.
+Modern software engineering requires navigating multi-disciplinary complexities:
 
-### 2. Autonomous Agent Collaboration
-Agents are organized around different software engineering stages and work together to build, update, and evolve the project.
+- **Unclear Requirements**: Translating high-level ideas into precise technical user stories takes significant time.
+- **Skill Separation**: Frontend, backend, database modeling, and DevOps require distinct expertise.
+- **Tool Context-Switching**: Developers constantly jump between IDEs, issue trackers, documentation tools, and chat apps.
+- **Late Testing & QA**: Quality checks often happen late in the development cycle, leading to compound bugs.
+- **Context Fragmentation**: Architectural decisions get lost across disparate chat logs and tickets.
+- **Communication Gaps**: Non-technical stakeholders struggle to monitor real-time engineering progress.
+- **Assistant Bottlenecks**: Traditional AI coding tools act as single-file prompt completers rather than coordinated teams.
 
-### 3. Visual Agent Execution
-Users maintain full visibility into agent statuses (*Waiting*, *Running*, *Completed*, *Failed*), current tasks, progress bars, and a real-time activity stream.
-
-### 4. Conversational Development
-Users can express change requests naturally (*e.g., "Add Excel export"*, *"Enable dark mode"*) rather than manually editing configuration files or writing boilerplate code.
-
-### 5. WhatsApp Development Interface
-Users can stay updated and manage their software projects on the go through a WhatsApp interface. *(Currently available in Demo/Mock Mode; production Meta WhatsApp Cloud API architecture built-in).*
+SwarmOS addresses these challenges through a **coordinated multi-agent architecture**.
 
 ---
 
-## ✨ Features & Status Matrix
+## 🛠 The SwarmOS Approach
 
-| Feature | Status | Description |
-| :--- | :---: | :--- |
-| **User Authentication** | ✅ Implemented | Secure JWT auth, BCrypt password hashing, and user profile management |
-| **Project Management** | ✅ Implemented | Create, list, filter, update, and delete software projects |
-| **AI Agent Swarm Workforce** | ✅ Implemented | 8 specialized AI agents collaborating on project execution |
-| **Agent Execution Monitoring** | ✅ Implemented | Live agent progress, status pills, current task tracking |
-| **3-Panel Developer Workspace** | ✅ Implemented | Fast 3-column workspace with quick loading & background updates |
-| **Live Activity Stream Timeline** | ✅ Implemented | Real-time event log tracking agent actions and project milestones |
-| **Conversational Command Engine** | ✅ Implemented | *"Talk to SwarmOS"* prompt box for submitting natural language change requests |
-| **Interactive Task Kanban** | ✅ Implemented | Create, update task status, view details, and assign agents |
-| **Interactive WhatsApp Simulator** | 🧪 Demo/Mock | Interactive phone chat simulator for hackathon demonstration |
-| **WhatsApp Cloud API Integration** | 🚧 Architecture Ready | Production Webhook endpoints (`GET/POST`) for Meta WhatsApp Cloud API |
-| **Responsive Developer SaaS UI** | ✅ Implemented | Modern dark-themed UI built with React, Tailwind CSS & Framer Motion |
+Instead of expecting one AI model to perform every engineering task, SwarmOS structures software development into dedicated agent roles:
+
+```mermaid
+flowchart TD
+    User["💡 User Requirement / Idea"] --> AgentPlanner["🧠 Planner Agent"]
+    AgentPlanner --> AgentReq["📋 Requirements Agent"]
+    AgentReq --> AgentArch["🏗 Architecture Agent"]
+    AgentArch --> AgentDB["🗄 Database Agent"]
+    AgentDB --> AgentBackend["⚙️ Backend Agent"]
+    AgentBackend --> AgentFrontend["🎨 Frontend Agent"]
+    AgentFrontend --> AgentTesting["🧪 Testing Agent"]
+    AgentTesting --> AgentDeploy["🚀 Deployment Agent"]
+    AgentDeploy --> Output["✨ Runnable Application Artifact"]
+```
+
+This modular architecture ensures software development is **structured**, **observable**, and **extensible**.
 
 ---
 
-## 🤖 AI Agent Team Roster
+## 💡 Why SwarmOS?
+
+### 🤖 Multi-Agent Engineering
+Coordinates multiple specialized agents representing distinct software engineering responsibilities.
+
+### 🌐 Shared Project Context
+Agents operate around a unified project workspace rather than isolated, ephemeral conversations.
+
+### 👁️ Visible Execution
+Users track agent activities, progress percentages, task assignments, and timeline logs in real time.
+
+### 🤝 Human-in-the-Loop
+Humans review, guide, and modify requirements while AI agents execute technical implementation details.
+
+### 💬 Conversational Development
+Submit feature requests naturally (*e.g., "Add Excel export"*, *"Implement dark mode"*) without manually rewriting boilerplate code.
+
+### 📱 External Communication
+Interact with your AI engineering team through external channels such as WhatsApp.
+
+### 🧩 Extensible Architecture
+Easily plug in additional specialized agents (*e.g., Security Auditor, Performance Optimizer*) as the platform scales.
+
+---
+
+## ✨ Core Features
+
+- **User Registration & JWT Auth**: Secure authentication with BCrypt password hashing and user profiles.
+- **Project Management**: Create, list, search, update, and manage software projects.
+- **AI Agent Swarm Workforce**: 8 specialized agent roles collaborating on project execution.
+- **Agent Execution Status**: Real-time monitoring of agent status (*Waiting*, *Running*, *Completed*, *Failed*).
+- **3-Panel Developer Workspace**: High-performance 3-column workspace with immediate shell loading and background fetching.
+- **Live Activity Stream**: Real-time event log tracking agent actions and system milestones.
+- **Conversational Project Commands**: *"Talk to SwarmOS"* prompt panel for natural-language feature requests.
+- **Task Management**: Create, assign, update, and inspect project tasks.
+- **Interactive WhatsApp Simulator (Demo Mode)**: Interactive mobile phone chat UI for project interaction.
+- **WhatsApp Cloud API Integration Architecture**: Webhook verification and endpoint handler for Meta WhatsApp Cloud API.
+- **Responsive Dark SaaS Interface**: Built with React 19, Tailwind CSS v4, Framer Motion, and Lucide icons.
+- **MongoDB Data Persistence**: Persistent storage for users, projects, tasks, agents, and activities.
+
+---
+
+## 🤖 AI Agent Team
 
 | Agent | Responsibility |
 | :--- | :--- |
-| 🧠 **Planner Agent** | Breaks natural language ideas into structured project plans & task breakdowns |
-| 📋 **Requirements Agent** | Converts user prompts into technical user stories, acceptance criteria & specs |
-| 🏗 **Architecture Agent** | Designs system architecture, microservice boundaries & component blueprints |
-| 🗄 **Database Agent** | Architects MongoDB schemas, collection structures & indexes |
-| ⚙️ **Backend Agent** | Generates Express RESTful APIs, controllers & authentication middleware |
-| 🎨 **Frontend Agent** | Builds responsive React components using Tailwind CSS and Lucide icons |
-| 🧪 **Testing Agent** | Performs unit testing, quality gate verification & vulnerability checks |
-| 🚀 **Deployment Agent** | Prepares build configurations, Docker containerization & deployment artifacts |
-
-*Note: Implementation depth for individual agent code generation cycles evolves continuously as project complexity scales.*
+| 🧠 **Planner Agent** | Converts natural-language ideas into structured development plans and task breakdowns |
+| 📋 **Requirements Agent** | Structures technical user stories, acceptance criteria, and feature specifications |
+| 🏗 **Architecture Agent** | Designs system topology, microservice boundaries, and component blueprints |
+| 🗄 **Database Agent** | Architects data models, collection schemas, and relational indexes |
+| ⚙️ **Backend Agent** | Develops Express RESTful APIs, controllers, and authentication middleware |
+| 🎨 **Frontend Agent** | Builds responsive user interfaces and component libraries |
+| 🧪 **Testing Agent** | Validates functional requirements, quality gates, and code integrity |
+| 🚀 **Deployment Agent** | Prepares build pipelines, containerization, and cloud deployment settings |
 
 ---
 
-## 📱 SwarmOS Anywhere — WhatsApp Development
+## 🖥️ Project Workspace
 
-SwarmOS is designed with the vision that developers and project leads should not need to remain glued to their laptop dashboard to manage software builds.
+The **SwarmOS Workspace** serves as the central mission control center. It answers key questions immediately:
 
-### Conceptual Conversational Flow
+- 📊 **"What is being built?"** — Project title, description, category, and overall progress percentage.
+- 🤖 **"What are the agents doing?"** — Active agent status pills, current active task, and progress bars.
+- 📋 **"What needs attention?"** — Pending tasks, agent assignment, and priority badges.
+- 💬 **"What can I change?"** — Conversational command box to submit natural-language change requests.
+
+---
+
+## 📱 SwarmOS Anywhere — WhatsApp Interaction
+
+Software development should not require users to stay tethered to a desktop dashboard. SwarmOS enables project management and status tracking via **WhatsApp**.
 
 ```text
-User: "Build an attendance management system for my college."
-SwarmOS: "Got it! I've created your project and assigned the Planner Agent to map requirements."
+User: "Build a college attendance management system."
+SwarmOS: "Project created! Planner Agent has started mapping requirements."
 
 [Later on mobile...]
 
 User: "Add Excel export feature."
-SwarmOS: "Change request received! Assigned task to Backend Agent and Frontend Agent."
+SwarmOS: "Change request received! Assigned to Backend Agent and Frontend Agent."
 ```
 
-### Integration Modes
-- 🧪 **Demo / Mock Mode** *(Default)*: Runs locally without requiring external paid services or Meta API credentials. Perfect for offline hackathon demonstrations and interactive testing.
-- 🚧 **Production Mode**: Connects directly to the **Meta WhatsApp Cloud API** via HTTPS Webhook verification (`GET /api/external-channels/whatsapp/webhook`).
+### Architecture Pipeline
+
+```mermaid
+flowchart LR
+    WA["📱 WhatsApp Client"] --> Webhook["Webhook Endpoint"]
+    Webhook --> Backend["SwarmOS Backend"]
+    Backend --> Auth["User & Project Lookup"]
+    Auth --> TaskEngine["Task Creation"]
+    TaskEngine --> Swarm["AI Agent Swarm"]
+    Swarm --> Status["Project Update"]
+    Status --> Response["WhatsApp Reply"]
+```
+
+### Current Integration Status
+- 🧪 **Mock / Demo Mode** *(Default)*: Self-contained interactive simulator on `/whatsapp`. Enables instant offline testing without external API keys.
+- 🚧 **Production Direction**: Configured for **Meta WhatsApp Cloud API** via HTTPS Webhook verification (`GET/POST /api/external-channels/whatsapp/webhook`).
+
+---
+
+## 🌍 Real-World Use Cases
+
+- 👨‍💻 **Individual Developers**: Rapidly bootstrap project foundations, API structures, and boilerplate UI.
+- 🚀 **Startups**: Turn product ideas into structured technical architecture and user stories faster.
+- 🎓 **Students & Educators**: Learn software engineering workflows through visible agent executions.
+- 👥 **Software Teams**: Automate routine planning, requirement breakdown, and initial task creation.
+- 📋 **Product Managers**: Express requirements naturally without manually creating every technical ticket.
+- 🛠 **Internal Tools**: Automate software prototype generation within enterprise environments.
+
+---
+
+## 🔄 User Journey
+
+1. **Sign Up**: Create an account with name, email, password, phone number, and WhatsApp consent.
+2. **Dashboard**: View overall metrics, recent projects, and active agent statuses.
+3. **Create Project**: Click `+ New Project` and describe your software idea.
+4. **Agent Team Initialization**: SwarmOS creates the project record and provisions the 8-agent swarm.
+5. **Workspace Open**: Enter the 3-panel workspace shell immediately.
+6. **Agent Execution**: Watch the Planner, Requirements, and Architecture agents initialize project specs.
+7. **Conversational Feedback**: Submit change requests (*e.g., "Add admin dashboard"*) via *"Talk to SwarmOS"*.
+8. **Task Allocation**: The Intent Classifier assigns tasks to relevant Backend and Frontend agents.
+9. **Activity Stream**: Track real-time progress in the activity timeline.
+10. **Mobile Interaction**: Open `/whatsapp` to control builds via WhatsApp commands.
+
+---
+
+## 📐 System Architecture
+
+```mermaid
+flowchart TD
+    subgraph Client ["Frontend Client"]
+        ReactApp["React 19 + Vite SaaS Dashboard"]
+        WASM["WhatsApp Simulator UI"]
+    end
+
+    subgraph API ["Backend API Server"]
+        Express["Node.js / Express 5 API Server"]
+        AuthMiddleware["JWT Auth Middleware"]
+        ChannelAdapter["External Channel Adapter"]
+    end
+
+    subgraph SwarmEngine ["Swarm Engine & Storage"]
+        Orchestrator["Swarm Orchestration Engine"]
+        IntentClassifier["Intent Classifier"]
+        MongoDB[("MongoDB Database")]
+    end
+
+    ReactApp <-->|REST API| Express
+    WASM <-->|REST API| Express
+    Express --> AuthMiddleware
+    AuthMiddleware --> Orchestrator
+    Orchestrator --> IntentClassifier
+    Orchestrator <--> MongoDB
+    ChannelAdapter <--> Express
+```
 
 ---
 
@@ -125,87 +227,66 @@ SwarmOS: "Change request received! Assigned task to Backend Agent and Frontend A
 
 ### Frontend
 - **Framework**: React 19, TypeScript, Vite
-- **Styling**: Tailwind CSS v4, Glassmorphism, CSS Gradients
+- **Styling**: Tailwind CSS v4, Glassmorphism design tokens
 - **Animations**: Framer Motion
 - **Icons**: Lucide React
 - **Routing**: React Router DOM v7
 
 ### Backend
-- **Runtime**: Node.js, Express 5
+- **Runtime**: Node.js, Express v5
 - **Database ODM**: Mongoose v9
 - **HTTP Client**: Axios
 - **File Uploads**: Multer
-- **Integrations**: Twilio SDK
+- **Integration**: Twilio SDK
 
-### Database & Security
+### Database & Auth
 - **Database**: MongoDB (Local or MongoDB Atlas)
 - **Authentication**: JSON Web Tokens (JWT), BCrypt.js
-- **Security**: Environment variables, input validation, user-project isolation
+
+### Development Tools
+- **Environment**: Nodemon, ESLint, Git
 
 ---
 
-## 📐 System Architecture
+## 📁 Project Structure
 
-```mermaid
-flowchart LR
-    subgraph Client ["Client Layer"]
-        Browser["React 19 Frontend Web App"]
-        Mobile["WhatsApp Chat Client"]
-    end
-
-    subgraph Server ["Server & API Layer"]
-        Express["Express 5 REST Server"]
-        Auth["JWT Auth Middleware"]
-        ChannelAdapter["External Channel Adapter"]
-    end
-
-    subgraph Engine ["Orchestration & Database"]
-        Orchestrator["Swarm Orchestrator Engine"]
-        MongoDB[("MongoDB Database")]
-    end
-
-    Browser <-->|REST API / JSON| Express
-    Mobile <-->|WhatsApp Webhook| ChannelAdapter
-    ChannelAdapter --> Express
-    Express --> Auth
-    Auth --> Orchestrator
-    Orchestrator <--> MongoDB
+```text
+SwarmOS-/
+├── backend/
+│   ├── config/             # Database configuration (db.js)
+│   ├── controllers/        # Route controllers (auth, project, agent, task, etc.)
+│   ├── middleware/         # JWT auth & external channel middleware
+│   ├── models/             # Mongoose schemas (User, Project, Task, Activity, etc.)
+│   ├── routes/             # Express API routes
+│   ├── services/           # Orchestrator, AI, agent, and channel services
+│   ├── .env                # Backend environment variables
+│   ├── package.json        # Backend dependencies & scripts
+│   └── server.js           # Express application entry point
+│
+├── frontend/
+│   ├── public/             # Static public assets
+│   ├── src/
+│   │   ├── components/     # Layout (Navbar, Sidebar, Footer) & feature components
+│   │   ├── context/        # AuthContext state provider
+│   │   ├── pages/          # Home, Login, Register, Dashboard, Workspace, WhatsAppPage
+│   │   ├── services/       # Frontend API client services
+│   │   ├── App.tsx         # React Router application root
+│   │   ├── main.tsx        # Vite entry point
+│   │   └── index.css       # Tailwind CSS styles & design system
+│   ├── package.json        # Frontend dependencies & scripts
+│   └── vite.config.ts      # Vite bundler configuration
+│
+├── .gitignore              # Git ignore rules
+└── README.md               # Product documentation
 ```
 
 ---
 
-## 🔄 User Flow
-
-1. **Visit SwarmOS**: Open the landing page at `http://localhost:5173/`.
-2. **Create Account**: Register with Name, Email, Password, Phone Number, and WhatsApp permission consent.
-3. **Login**: Authenticate and redirect automatically to the Dashboard.
-4. **Create Project**: Click `+ New Project` and describe what you want to build (*e.g., "Build a college attendance management system"*).
-5. **Team Assembly**: SwarmOS creates the project record and initializes the 8-agent team.
-6. **Workspace Launch**: Enter the 3-panel developer workspace.
-7. **Monitor Agents**: Watch agent statuses (*Running*, *Completed*) and real-time activity logs.
-8. **Talk to SwarmOS**: Submit change requests (*e.g. "Add Excel export"*) via the command panel or quick chips.
-9. **Task Allocation**: Orchestrator classifies intent, creates a task in MongoDB, and assigns relevant agents.
-10. **WhatsApp Interaction**: Navigate to `/whatsapp` to simulate or test mobile WhatsApp commands.
-
----
-
-## 🖥️ Product Screens
-
-*(Add screenshot images to `docs/screenshots/` to display visually)*
-
-- 📍 **Landing Page**: `docs/screenshots/landing.png`
-- 📍 **Authentication**: `docs/screenshots/login.png`
-- 📍 **Dashboard**: `docs/screenshots/dashboard.png`
-- 📍 **Project Workspace**: `docs/screenshots/workspace.png`
-- 📍 **WhatsApp Control**: `docs/screenshots/whatsapp.png`
-
----
-
-## 🚀 Local Setup Instructions
+## 🚀 Installation & Setup
 
 ### Prerequisites
-- **Node.js**: v18+ installed
-- **MongoDB**: Local MongoDB instance running on `mongodb://127.0.0.1:27017/swarmos` or a MongoDB Atlas URI.
+- **Node.js**: v18.0.0 or higher
+- **MongoDB**: Local MongoDB instance (`mongodb://127.0.0.1:27017/swarmos`) or MongoDB Atlas URI
 
 ### 1. Clone Repository
 ```bash
@@ -219,7 +300,7 @@ cd backend
 npm install
 npm run dev
 ```
-*Backend server will start on `http://localhost:5000`.*
+*Backend server runs on `http://localhost:5000`.*
 
 ### 3. Frontend Setup
 Open a new terminal window:
@@ -228,7 +309,7 @@ cd frontend
 npm install
 npm run dev
 ```
-*Frontend application will run on `http://localhost:5173`.*
+*Frontend app runs on `http://localhost:5173`.*
 
 ---
 
@@ -237,55 +318,133 @@ npm run dev
 Create `.env` inside `backend/`:
 
 ```env
+# Server & Database Configuration
 PORT=5000
 MONGO_URI=mongodb://127.0.0.1:27017/swarmos
 JWT_SECRET=your_jwt_secret_key_here
 
-# WhatsApp Configuration
+# WhatsApp Configuration (Mock Mode)
 WHATSAPP_MODE=mock
-WHATSAPP_ACCESS_TOKEN=your_meta_access_token
-WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
-WHATSAPP_BUSINESS_ACCOUNT_ID=your_business_account_id
-WHATSAPP_VERIFY_TOKEN=swarmos_verify_token
+
+# WhatsApp Configuration (Production Mode — Optional)
+# WHATSAPP_MODE=real
+# WHATSAPP_ACCESS_TOKEN=your_meta_whatsapp_access_token
+# WHATSAPP_PHONE_NUMBER_ID=your_whatsapp_phone_number_id
+# WHATSAPP_BUSINESS_ACCOUNT_ID=your_whatsapp_business_account_id
+# WHATSAPP_VERIFY_TOKEN=swarmos_verify_token
 ```
 
-> [!NOTE]
-> Real WhatsApp credentials are only required when setting `WHATSAPP_MODE=real`. In `WHATSAPP_MODE=mock`, SwarmOS runs completely self-contained.
+---
+
+## 🛡️ Security
+
+- **Environment Isolation**: Sensitive keys and database URIs remain in `.env` files.
+- **Git Protection**: `.env` and `.env.*` files are explicitly excluded via `.gitignore`.
+- **JWT Route Protection**: All project, task, and agent APIs require valid JWT authorization headers.
+- **Password Security**: User passwords are encrypted using BCrypt.js before database insertion.
+- **User Ownership Isolation**: Data queries restrict project and task access strictly to authenticated account owners.
 
 ---
 
-## 🎬 Hackathon Demo Mode
+## 📊 Development Status
 
-For hackathon judges and evaluators, SwarmOS includes a built-in **Hackathon Demo Mode**:
-- **Offline Reliability**: The platform operates without requiring external paid API keys or active WhatsApp Business accounts.
-- **Interactive Simulator**: The `/whatsapp` page includes an interactive WhatsApp phone UI simulator that dispatches real commands to the backend orchestrator and demonstrates live agent status updates.
+### ✅ Implemented
+- User Registration & JWT Authentication
+- Full Project Lifecycle Management
+- 8-Agent Swarm Visualization & Execution Tracking
+- 3-Panel Developer Workspace with Instant Shell Loading
+- Conversational Command Panel (*"Talk to SwarmOS"*)
+- Real-time Activity Timeline Logging
+- Interactive Task Management Modal
+- Mock WhatsApp Phone Simulator Page (`/whatsapp`)
+- Production Meta WhatsApp Cloud API Webhook Architecture
+
+### 🧪 Demo / Mock
+- Interactive WhatsApp Simulator on `/whatsapp`
+
+### 🚧 In Development
+- Automated End-to-End Sandbox Code Generation
+- Automated Unit Test Execution Runner
+
+### 🔮 Planned
+- One-Click Cloud Deployment (Vercel, Render, GCP)
+- GitHub Repository Sync & PR Generation
+- Voice-Based Project Commands
+- Persistent Multi-Project Memory
+- Multi-Developer Real-Time Collaboration
 
 ---
 
-## 🏆 Why SwarmOS? (Hackathon Value)
+## 🛣️ Product Roadmap
 
-- 💡 **Innovation**: Combines multi-agent software engineering swarms with mobile conversational control.
-- 🎯 **Practicality**: Simplifies the complex multi-step process of going from idea to software structure.
-- ⚡ **Performance**: Built with fast-loading workspace shells, background fetching, and zero-latency UI interactions.
-- 🔌 **Extensibility**: Modular agent architecture allows plugging in additional specialized AI agents (*e.g., Security, DevOps, RAG*).
-- 🤝 **Human-AI Partnership**: Developers remain in total control while AI agents execute heavy lifting.
+### Phase 1 — Foundation (Completed)
+- [x] JWT Authentication & User Profiles
+- [x] Project Management & Persistence
+- [x] 3-Panel Developer Workspace
+- [x] 8-Agent Swarm Architecture
+
+### Phase 2 — AI Engineering (Current)
+- [x] Conversational Command Engine
+- [x] Intent Classification & Task Creation
+- [ ] End-to-End Code Sandbox Execution
+- [ ] Persistent Agent Memory
+
+### Phase 3 — Integrations (Next)
+- [x] WhatsApp Cloud API Webhook Adapter
+- [ ] GitHub Integration & Automated Commits
+- [ ] Issue Tracker Sync (Jira / GitHub Issues)
+
+### Phase 4 — Cloud & Deployment (Future)
+- [ ] One-Click Cloud Deployment
+- [ ] Automated CI/CD Pipelines
+- [ ] Live Application Preview Hosting
 
 ---
 
-## 🛣️ Roadmap
+## 🎯 Product Principles
 
-- [x] ✅ **Multi-Agent Swarm Workforce (8 Specialized Roles)**
-- [x] ✅ **3-Panel Developer Workspace with Fast Loading Shell**
-- [x] ✅ **Conversational Project Commands & Intent Classifier**
-- [x] ✅ **Demo/Mock WhatsApp Interactive Control Center**
-- [x] ✅ **Meta WhatsApp Cloud API Production Webhook Architecture**
-- [ ] 🚧 **Automated End-to-End Code Sandbox Execution**
-- [ ] 🔮 **One-Click Cloud Deployment (Vercel / Render / GCP)**
-- [ ] 🔮 **Voice-Based Project Commands**
-- [ ] 🔮 **Multi-Developer Real-Time Collaboration**
+- **Human in Control**: AI assists and accelerates development; humans make strategic architectural decisions.
+- **Observable AI**: Agent workflows, task queues, and progress bars must remain visible and transparent.
+- **Modular Agents**: Agents maintain domain specialization rather than monolithic prompt execution.
+- **Secure by Design**: Credentials and user data are protected at every boundary.
+- **Extensible Architecture**: Built to easily adopt new AI models, agents, and external integrations.
+- **Practical Automation**: Focuses on solving real developer workflow friction.
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repository: `https://github.com/Pooja-1109/SwarmOS-`
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit changes: `git commit -m "feat: add amazing feature"`
+4. Push to branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
 
 ---
 
 ## 📄 License
 
-This project is licensed under the **ISC License** - see the `backend/package.json` file for details.
+This project is licensed under the **ISC License** — see the [backend/package.json](file:///c:/Users/Dell/OneDrive/Documents/btechpooja/swarmOS/SwarmOS-/backend/package.json) file for details.
+
+---
+
+## 🔗 Product Links
+
+- **GitHub Repository**: [https://github.com/Pooja-1109/SwarmOS-](https://github.com/Pooja-1109/SwarmOS-)
+
+---
+
+## 🖥️ Product Screens
+
+*(Place screenshots in `docs/screenshots/` to display visually)*
+
+- 📍 **Landing Page**: `docs/screenshots/landing.png`
+- 📍 **Dashboard**: `docs/screenshots/dashboard.png`
+- 📍 **Project Workspace**: `docs/screenshots/workspace.png`
+- 📍 **WhatsApp Control**: `docs/screenshots/whatsapp.png`
+
+---
+
+## 🏆 Demonstration
+
+SwarmOS is designed as a long-term AI software engineering platform, and can also be demonstrated in AI innovation showcases, developer conferences, and hackathons.
