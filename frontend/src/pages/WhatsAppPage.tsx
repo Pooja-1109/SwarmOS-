@@ -512,10 +512,10 @@ Tell me what you'd like to build, change, or improve today!`,
               {messages.length <= 2 && (
                 <div className="px-4 py-2 bg-zinc-950 border-t border-zinc-900 flex gap-2 overflow-x-auto text-[11px] font-medium no-scrollbar">
                   {[
-                    "Build a library management system",
-                    "Add admin login and role-based access",
-                    "Change dashboard to dark mode",
-                    "Add overdue notifications",
+                    "Build something",
+                    "Add a feature",
+                    "Improve UI",
+                    "Fix a problem",
                     "Run my project",
                   ].map((chip, i) => (
                     <button

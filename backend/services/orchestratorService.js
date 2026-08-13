@@ -168,7 +168,10 @@ const orchestrateProjectRequest = async ({ projectId, userId, prompt }) => {
   // Specialized Natural Conversational AI Response Generation
   const lower = prompt.toLowerCase().trim();
   let conversationalMessage = "";
-  let actionButtons = [{ label: "▶ Run Project", action: "run_project" }];
+  let actionButtons = [
+    { label: "🚀 Open Updated Project", action: "open_runtime" },
+    { label: "▶ Run Project", action: "run_project" },
+  ];
   let agentStatuses = [
     { name: "Planner Agent", status: "Completed" },
     { name: "Developer Agent", status: "Completed" },
@@ -182,26 +185,32 @@ const orchestrateProjectRequest = async ({ projectId, userId, prompt }) => {
       { label: "🎓 Build Attendance System", action: "build_attendance" },
     ];
     agentStatuses = [];
+  } else if (lower === "yes" || lower === "yep" || lower === "yeah" || lower === "sure") {
+    conversationalMessage = `Yep, let's add it. I'll include admin login and an admin dashboard.`;
+  } else if (lower.includes("overdue notifications") || lower.includes("notifications")) {
+    conversationalMessage = `Sure — I'll add overdue notifications to the ${project.title || "library"} project.`;
+  } else if (lower.includes("don't like") || lower.includes("dont like")) {
+    conversationalMessage = `That's fair 😄 Tell me what you don't like about it, or I can redesign it with a cleaner modern layout.`;
   } else if (lower.includes("what should i add") || lower.includes("what do you think") || lower.includes("suggestions")) {
-    conversationalMessage = `For a ${project.title || "software system"}, I'd probably add search, overdue reminders, reports, and a simple user dashboard. That would make it feel much more complete.`;
+    conversationalMessage = `I'd add overdue reminders, search, reports and a member dashboard. Those would make it feel much more complete.`;
     actionButtons = [
       { label: "🔒 Add Admin Login", action: "add_admin" },
       { label: "📊 Add Reports", action: "add_reports" },
     ];
   } else if (lower.includes("dark") || lower.includes("theme") || lower.includes("color")) {
     conversationalMessage = `Sure — I'll make the dashboard and main pages dark too.`;
-    actionButtons = [
-      { label: "▶ Run Project", action: "run_project" },
-      { label: "👁 Open Workspace", action: "open_workspace" },
-    ];
   } else if (lower.includes("admin") || lower.includes("login")) {
-    conversationalMessage = `Yep, we can do that. I'll add admin login and an admin dashboard to the project.`;
+    conversationalMessage = `Yep, let's add it. I'll include admin login and an admin dashboard.`;
+  } else if (lower.includes("ui") || lower.includes("look better") || lower.includes("cleaner") || lower.includes("boring")) {
+    conversationalMessage = `Sure. I'll clean up the layout, spacing and dashboard cards and make the interface feel more polished.`;
+  } else if (lower.includes("books") && lower.includes("members")) {
+    conversationalMessage = `Nice. That's a solid start.\n\nI'd suggest:\n• Books\n• Members\n• Issue & return\n• Overdue tracking\n• Search\n• Dashboard\n\nDo you want admin login too?`;
     actionButtons = [
+      { label: "🔒 Add Admin Login", action: "add_admin" },
       { label: "▶ Run Project", action: "run_project" },
-      { label: "👁 Open Workspace", action: "open_workspace" },
     ];
-  } else if (lower.includes("library") || lower.includes("attendance") || lower.includes("build")) {
-    conversationalMessage = `Sure 😊 What kind of project do you want?\n\nFor example, we could have:\n• books & catalog\n• member profiles\n• issue and return tracking\n• overdue alerts\n• reports\n\nOr just tell me what you have in mind and I'll help you figure it out.`;
+  } else if (lower.includes("library") || lower.includes("website") || lower.includes("build")) {
+    conversationalMessage = `Sure 😊 Tell me a little about it, or I can help you plan one.`;
     actionButtons = [
       { label: "▶ Run Project", action: "run_project" },
       { label: "🔒 Add Admin Login", action: "add_admin" },
@@ -211,20 +220,12 @@ const orchestrateProjectRequest = async ({ projectId, userId, prompt }) => {
       const runRes = await runnerService.runProject(project._id);
       conversationalMessage = `🚀 Launched your project server for **${project.title}**!\n\nYour application is live at:\n**${runRes.url}**`;
       actionButtons = [{ label: "🚀 Open Running Project", action: "open_runtime" }];
-      agentStatuses = [
-        { name: "Runner Agent", status: "Active" },
-      ];
+      agentStatuses = [{ name: "Runner Agent", status: "Active" }];
     } catch (e) {
       conversationalMessage = `Project is ready. Click **[ ▶ Run Project ]** to launch the runtime server.`;
     }
-  } else if (lower.includes("cleaner") || lower.includes("better") || lower.includes("boring") || lower.includes("fix")) {
-    conversationalMessage = `Got it. I'm updating the layout and visual design through the UI/UX and Developer agents to make it look sleek and modern.`;
-    actionButtons = [
-      { label: "▶ Run Project", action: "run_project" },
-      { label: "👁 Open Workspace", action: "open_workspace" },
-    ];
   } else {
-    conversationalMessage = `Yep, I've updated **${project.title}** with your request: "${prompt}". I'm materializing the changes now.`;
+    conversationalMessage = `Got it. I've updated **${project.title}** with your request: "${prompt}".`;
   }
 
   return {

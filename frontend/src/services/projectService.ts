@@ -66,7 +66,12 @@ export const downloadProjectZip = async (id: string) => {
     });
 
     let filename = `swarmos-project.zip`;
-    const disposition = response.headers["content-disposition"];
+    const headers = response.headers;
+    const disposition =
+      headers["content-disposition"] ||
+      headers["Content-Disposition"] ||
+      (typeof headers.get === "function" ? headers.get("content-disposition") : null);
+
     if (disposition && disposition.includes("filename=")) {
       const match = disposition.match(/filename="?([^";]+)"?/);
       if (match && match[1]) filename = match[1];
@@ -75,13 +80,20 @@ export const downloadProjectZip = async (id: string) => {
     const blob = new Blob([response.data], { type: "application/zip" });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
+    link.style.display = "none";
     link.href = url;
     link.setAttribute("download", filename);
     document.body.appendChild(link);
     link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+
+    setTimeout(() => {
+      if (link.parentNode) {
+        link.parentNode.removeChild(link);
+      }
+      window.URL.revokeObjectURL(url);
+    }, 500);
   } catch (err: any) {
+    console.error("Download ZIP Error:", err);
     if (err.response) {
       if (err.response.status === 401) {
         alert("Please log in again.");
