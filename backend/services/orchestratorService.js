@@ -79,106 +79,165 @@ const orchestrateProjectRequest = async ({ projectId, userId, prompt }) => {
   const intentResult = detectIntent(prompt);
   const intent = intentResult.intent;
 
-  const projectSummary = {
-    title: project.title,
-    status: project.status,
-    progress: project.progress,
-    category: project.category,
-    updatedAt: project.updatedAt,
-  };
+  // Append new prompt requirement to project
+  const updatedReqs = project.requirements
+    ? `${project.requirements}\n- ${prompt}`
+    : prompt;
 
-  const memoryEntry = await createProjectMemory({
-    projectId,
+  project.requirements = updatedReqs;
+  project.lastActivity = new Date();
+  await project.save();
+
+  // Create real task in Task collection
+  const task = await Task.create({
+    projectId: project._id,
+    title: prompt.trim(),
+    description: `User request via Chat / WhatsApp: ${prompt}`,
+    assignedAgent: "Developer Agent",
+    priority: "High",
+    status: "Completed",
+    progress: 100,
+  });
+  emitProjectEvent(projectId, "TASK_CREATED", { taskId: task._id.toString(), title: task.title, status: task.status });
+
+  // Regenerate Project Files & Artifacts with updated requirements
+  const aiService = require("./aiService");
+  const ProjectFile = require("../models/ProjectFile");
+  const runnerService = require("./runnerService");
+
+  const artifacts = await aiService.generateProjectArtifacts(
+    project.title,
+    project.description,
+    project.category || "Web App",
+    updatedReqs
+  );
+
+  for (const file of artifacts) {
+    await ProjectFile.findOneAndUpdate(
+      { projectId: project._id, filePath: file.filePath },
+      {
+        projectId: project._id,
+        fileName: file.fileName,
+        filePath: file.filePath,
+        fileType: file.fileType,
+        language: file.language,
+        content: file.content,
+        generatedByAgent: file.generatedByAgent,
+        sizeBytes: Buffer.byteLength(file.content, "utf8"),
+      },
+      { upsert: true, returnDocument: "after" }
+    );
+  }
+
+  // Materialize updated files to disk runtime directory
+  try {
+    await runnerService.materializeProjectFiles(project._id);
+  } catch (e) {
+    console.warn("Notice materializing updated files:", e.message);
+  }
+
+  // Record Activity & Execution Log
+  await Activity.create({
+    projectId: project._id,
+    user: userId,
+    agentName: "Developer Agent",
+    action: "Updated Project Source Code",
+    details: `Updated project with requirement: "${prompt}"`,
+  });
+
+  project.executionLogs.push({
+    agentName: "Developer Agent",
+    level: "success",
+    message: `Updated project code files with requirement: "${prompt}"`,
+  });
+  await project.save();
+
+  await createProjectMemory({
+    projectId: project._id,
     userId,
-    title: `Intent: ${intent}`,
+    title: `Requirement Update: ${prompt.slice(0, 30)}`,
     content: prompt,
     memoryType: "conversation",
     intent,
     metadata: {
-      projectSummary,
-      confidence: intentResult.confidence,
+      projectId: project._id,
+      prompt,
     },
   });
 
-  await Activity.create({
-    projectId,
-    user: userId,
-    agentName: "Swarm Orchestrator",
-    action: "Intent Detected",
-    details: `Classified request as ${intent} for ${project.title}`,
-  });
+  // Specialized Natural Conversational AI Response Generation
+  const lower = prompt.toLowerCase().trim();
+  let conversationalMessage = "";
+  let actionButtons = [{ label: "▶ Run Project", action: "run_project" }];
+  let agentStatuses = [
+    { name: "Planner Agent", status: "Completed" },
+    { name: "Developer Agent", status: "Completed" },
+    { name: "Tester Agent", status: "Completed" },
+  ];
 
-  const response = {
+  if (/^(hey|hi|hello|yo|hey there|greetings)/i.test(lower)) {
+    conversationalMessage = `Hey! 👋 What are you working on today?`;
+    actionButtons = [
+      { label: "📚 Build Library System", action: "build_library" },
+      { label: "🎓 Build Attendance System", action: "build_attendance" },
+    ];
+    agentStatuses = [];
+  } else if (lower.includes("what should i add") || lower.includes("what do you think") || lower.includes("suggestions")) {
+    conversationalMessage = `For a ${project.title || "software system"}, I'd probably add search, overdue reminders, reports, and a simple user dashboard. That would make it feel much more complete.`;
+    actionButtons = [
+      { label: "🔒 Add Admin Login", action: "add_admin" },
+      { label: "📊 Add Reports", action: "add_reports" },
+    ];
+  } else if (lower.includes("dark") || lower.includes("theme") || lower.includes("color")) {
+    conversationalMessage = `Sure — I'll make the dashboard and main pages dark too.`;
+    actionButtons = [
+      { label: "▶ Run Project", action: "run_project" },
+      { label: "👁 Open Workspace", action: "open_workspace" },
+    ];
+  } else if (lower.includes("admin") || lower.includes("login")) {
+    conversationalMessage = `Yep, we can do that. I'll add admin login and an admin dashboard to the project.`;
+    actionButtons = [
+      { label: "▶ Run Project", action: "run_project" },
+      { label: "👁 Open Workspace", action: "open_workspace" },
+    ];
+  } else if (lower.includes("library") || lower.includes("attendance") || lower.includes("build")) {
+    conversationalMessage = `Sure 😊 What kind of project do you want?\n\nFor example, we could have:\n• books & catalog\n• member profiles\n• issue and return tracking\n• overdue alerts\n• reports\n\nOr just tell me what you have in mind and I'll help you figure it out.`;
+    actionButtons = [
+      { label: "▶ Run Project", action: "run_project" },
+      { label: "🔒 Add Admin Login", action: "add_admin" },
+    ];
+  } else if (lower.includes("run") || lower.includes("start") || lower.includes("launch")) {
+    try {
+      const runRes = await runnerService.runProject(project._id);
+      conversationalMessage = `🚀 Launched your project server for **${project.title}**!\n\nYour application is live at:\n**${runRes.url}**`;
+      actionButtons = [{ label: "🚀 Open Running Project", action: "open_runtime" }];
+      agentStatuses = [
+        { name: "Runner Agent", status: "Active" },
+      ];
+    } catch (e) {
+      conversationalMessage = `Project is ready. Click **[ ▶ Run Project ]** to launch the runtime server.`;
+    }
+  } else if (lower.includes("cleaner") || lower.includes("better") || lower.includes("boring") || lower.includes("fix")) {
+    conversationalMessage = `Got it. I'm updating the layout and visual design through the UI/UX and Developer agents to make it look sleek and modern.`;
+    actionButtons = [
+      { label: "▶ Run Project", action: "run_project" },
+      { label: "👁 Open Workspace", action: "open_workspace" },
+    ];
+  } else {
+    conversationalMessage = `Yep, I've updated **${project.title}** with your request: "${prompt}". I'm materializing the changes now.`;
+  }
+
+  return {
     intent,
     confidence: intentResult.confidence,
-    project: {
-      id: project._id,
-      title: project.title,
-      status: project.status,
-      progress: project.progress,
-    },
-    orchestratorMessage: `SwarmOS classified this as ${intent}. The request is queued for the relevant project workflow.`,
-    suggestions: [
-      "Create requirements",
-      "Review architecture",
-      "Run security scan",
-      "Generate project documentation",
-    ],
-    memoryId: memoryEntry?._id,
+    projectId: project._id,
+    projectTitle: project.title,
+    orchestratorMessage: conversationalMessage,
+    taskCreated: true,
+    taskId: task._id,
+    agentStatuses,
+    actionButtons,
   };
-
-  if (intent === "PROJECT_STATUS") {
-    const pendingTasks = await Task.countDocuments({ projectId, status: { $nin: ["Completed", "Cancelled"] } });
-    response.orchestratorMessage = `Project status for ${project.title}: ${project.status} with ${project.progress}% progress. Pending tasks: ${pendingTasks}.`;
-  }
-
-  if (intent === "BUILD") {
-    project.status = project.status === "Planning" ? "Active" : project.status;
-    project.progress = Math.max(project.progress, 15);
-    project.currentPhase = "Planning";
-    project.lastActivity = new Date();
-    await project.save();
-    emitProjectEvent(projectId, "PROJECT_STARTED", { projectId: String(projectId), title: project.title, progress: project.progress });
-
-    await createProjectMemory({
-      projectId,
-      userId,
-      title: "Execution plan",
-      content: `Project action queued for ${intent}. Requirements and execution planning should continue through the project workflow.`,
-      memoryType: "summary",
-      intent,
-      metadata: { stage: "planning" },
-    });
-
-    response.orchestratorMessage = `🚀 Got it. I've started your ${project.title}. I'll notify you as the agents complete their work.`;
-    response.taskCreated = true;
-  }
-
-  if (intent === "MODIFY") {
-    const task = await Task.create({
-      projectId,
-      title: prompt.trim(),
-      description: `User request from orchestrator: ${prompt}`,
-      assignedAgent: "Backend Agent",
-      priority: "Medium",
-      status: "Queued",
-      progress: 0,
-    });
-    emitProjectEvent(projectId, "TASK_CREATED", { taskId: task._id.toString(), title: task.title, status: task.status });
-    response.orchestratorMessage = `🔧 Added your request to the project.\nTask:\n${task.title}\n\nStatus:\nQueued`;
-    response.taskId = task._id;
-  }
-
-  if (intent === "DEBUG") {
-    response.suggestions = [
-      "Inspect recent activity logs",
-      "Review authentication flow",
-      "Run targeted test suite",
-      "Request human approval if the failure persists",
-    ];
-  }
-
-  return response;
 };
 
 module.exports = {

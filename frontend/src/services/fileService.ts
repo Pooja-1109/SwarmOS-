@@ -27,3 +27,8 @@ export const deleteFile = async (id: string) => {
   const response = await API.delete(`/files/${id}`);
   return response.data;
 };
+
+export const queryProjectKnowledge = async (projectId: string, query: string) => {
+  const response = await API.post("/files/query", { projectId, query });
+  return response.data;
+};

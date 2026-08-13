@@ -85,6 +85,41 @@ const projectSchema = new mongoose.Schema(
         lastActivity: { type: Date, default: Date.now },
       },
     ],
+    executionLogs: [
+      {
+        agentName: { type: String, required: true },
+        level: { type: String, enum: ["info", "success", "warn", "error"], default: "info" },
+        message: { type: String, required: true },
+        timestamp: { type: Date, default: Date.now },
+      },
+    ],
+    timelinePhases: [
+      {
+        phase: { type: String, required: true },
+        status: { type: String, enum: ["Pending", "In Progress", "Completed", "Failed"], default: "Pending" },
+        completedAt: { type: Date },
+        assignedAgent: { type: String },
+      },
+    ],
+    generatedFilesCount: { type: Number, default: 0 },
+    knowledgeBaseCount: { type: Number, default: 0 },
+    runtimeStatus: {
+      type: String,
+      enum: ["idle", "starting", "running", "failed", "stopped"],
+      default: "idle",
+    },
+    runtimePort: { type: Number, default: 0 },
+    runtimeUrl: { type: String, default: "" },
+    runtimePid: { type: Number, default: 0 },
+    runtimeStartedAt: { type: Date },
+    runtimeError: { type: String, default: "" },
+    deploymentStatus: {
+      type: String,
+      enum: ["not_configured", "deploying", "deployed", "failed"],
+      default: "not_configured",
+    },
+    deploymentUrl: { type: String, default: "" },
+    deploymentError: { type: String, default: "" },
   },
   {
     timestamps: true,

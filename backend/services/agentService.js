@@ -1,9 +1,7 @@
-// backend/services/agentService.js
-// Multi-Agent Workflow Engine & Swarm Orchestrator
-
 const Project = require("../models/Project");
 const Task = require("../models/Task");
 const Activity = require("../models/Activity");
+const ProjectFile = require("../models/ProjectFile");
 const aiService = require("./aiService");
 
 const DEFAULT_AGENTS = [
@@ -23,19 +21,36 @@ const DEFAULT_AGENTS = [
  */
 const initializeProjectAgents = (existingAgents = []) => {
   if (!existingAgents || existingAgents.length === 0) {
-    return DEFAULT_AGENTS.map(agent => ({ ...agent, lastActivity: new Date() }));
+    return DEFAULT_AGENTS.map((agent) => ({ ...agent, lastActivity: new Date() }));
   }
 
-  const existingNames = new Set(existingAgents.map(a => a.name));
+  const existingNames = new Set(existingAgents.map((a) => a.name));
   const merged = [...existingAgents];
 
-  DEFAULT_AGENTS.forEach(defAgent => {
+  DEFAULT_AGENTS.forEach((defAgent) => {
     if (!existingNames.has(defAgent.name)) {
       merged.push({ ...defAgent, lastActivity: new Date() });
     }
   });
 
   return merged;
+};
+
+const addExecutionLog = async (projectId, agentName, message, level = "info") => {
+  try {
+    await Project.findByIdAndUpdate(projectId, {
+      $push: {
+        executionLogs: {
+          agentName,
+          message,
+          level,
+          timestamp: new Date(),
+        },
+      },
+    });
+  } catch (err) {
+    console.warn("Log write warning:", err.message);
+  }
 };
 
 /**
@@ -49,6 +64,8 @@ const runAgentSwarm = async (projectId, userId) => {
   project.agents = initializeProjectAgents(project.agents);
   await project.save();
 
+  await addExecutionLog(projectId, "Swarm Orchestrator", `Started multi-agent orchestration for ${project.title}`, "info");
+
   // Log activity
   await Activity.create({
     projectId: project._id,
@@ -59,7 +76,7 @@ const runAgentSwarm = async (projectId, userId) => {
   });
 
   // Step 1: Planner Agent analyzes requirements and generates tasks
-  const plannerIdx = project.agents.findIndex(a => a.name.includes("Planner"));
+  const plannerIdx = project.agents.findIndex((a) => a.name.includes("Planner"));
   if (plannerIdx !== -1) {
     project.agents[plannerIdx].status = "Working";
     project.agents[plannerIdx].currentTask = "Analyzing requirements & generating task breakdown";
@@ -97,6 +114,8 @@ const runAgentSwarm = async (projectId, userId) => {
     await project.save();
   }
 
+  await addExecutionLog(projectId, "Planner Agent", `Created ${generatedTasks.length} structured development tasks.`, "success");
+
   await Activity.create({
     projectId: project._id,
     user: userId,
@@ -105,8 +124,38 @@ const runAgentSwarm = async (projectId, userId) => {
     details: `Created ${generatedTasks.length} structured development tasks.`,
   });
 
+  // Step 2: Generate and save actual project code & documentation artifacts to MongoDB
+  const artifacts = await aiService.generateProjectArtifacts(
+    project.title,
+    project.description,
+    project.category
+  );
+
+  for (const file of artifacts) {
+    await ProjectFile.findOneAndUpdate(
+      { projectId: project._id, filePath: file.filePath },
+      {
+        projectId: project._id,
+        fileName: file.fileName,
+        filePath: file.filePath,
+        fileType: file.fileType,
+        language: file.language,
+        content: file.content,
+        generatedByAgent: file.generatedByAgent,
+        sizeBytes: Buffer.byteLength(file.content, "utf8"),
+      },
+      { upsert: true, returnDocument: "after" }
+    );
+
+    await addExecutionLog(projectId, file.generatedByAgent, `Generated artifact: ${file.filePath}`, "info");
+  }
+
+  const filesCount = await ProjectFile.countDocuments({ projectId: project._id });
+  project.generatedFilesCount = filesCount;
+  await project.save();
+
   // Asynchronous Swarm background execution loop
-  executeSwarmLoop(project._id, userId).catch(err => console.error("Swarm background execution error:", err));
+  executeSwarmLoop(project._id, userId).catch((err) => console.error("Swarm background execution error:", err));
 
   return project;
 };
@@ -125,11 +174,13 @@ const executeSwarmLoop = async (projectId, userId) => {
     const task = tasks[i];
 
     // Find assigned agent
-    const agentIndex = project.agents.findIndex(a => a.name === task.assignedAgent || task.assignedAgent.includes(a.name.split(" ")[0]));
+    const agentIndex = project.agents.findIndex(
+      (a) => a.name === task.assignedAgent || task.assignedAgent.includes(a.name.split(" ")[0])
+    );
     if (agentIndex !== -1) {
       project.agents[agentIndex].status = "Working";
       project.agents[agentIndex].currentTask = `Executing: ${task.title}`;
-      project.agents[agentIndex].progress = 40;
+      project.agents[agentIndex].progress = 50;
       await project.save();
     }
 
@@ -138,12 +189,16 @@ const executeSwarmLoop = async (projectId, userId) => {
     task.progress = 50;
     await task.save();
 
-    await new Promise(r => setTimeout(r, 2500)); // Delay between agent steps
+    await addExecutionLog(projectId, task.assignedAgent || "Swarm Agent", `Started task: "${task.title}"`, "info");
+
+    await new Promise((r) => setTimeout(r, 1200)); // Delay between agent steps
 
     // Update task to Completed
     task.status = "Completed";
     task.progress = 100;
     await task.save();
+
+    await addExecutionLog(projectId, task.assignedAgent || "Swarm Agent", `Completed task: "${task.title}"`, "success");
 
     // Log Activity
     await Activity.create({
@@ -170,7 +225,10 @@ const executeSwarmLoop = async (projectId, userId) => {
   // Finalize project state
   project.status = "Completed";
   project.progress = 100;
+  project.currentPhase = "Completed";
   await project.save();
+
+  await addExecutionLog(projectId, "Project Manager Agent", "All multi-agent workflow tasks completed successfully!", "success");
 
   await Activity.create({
     projectId,
@@ -184,4 +242,6 @@ const executeSwarmLoop = async (projectId, userId) => {
 module.exports = {
   initializeProjectAgents,
   runAgentSwarm,
+  addExecutionLog,
 };
+

@@ -2,10 +2,13 @@ const Message = require("../models/Message");
 const Project = require("../models/Project");
 const { answerWithRAG } = require("../services/ragService");
 
-// Send Chat Message with RAG Knowledge Base context
+const { orchestrateProjectRequest } = require("../services/orchestratorService");
+
+// Send Chat Message with Conversational AI & Orchestrator Action Engine
 const sendChatMessage = async (req, res) => {
   try {
     const { projectId, text } = req.body;
+    const userId = req.user?.id || req.user?._id;
 
     if (!projectId || !text) {
       return res.status(400).json({ message: "projectId and text are required" });
@@ -21,24 +24,27 @@ const sendChatMessage = async (req, res) => {
       text,
     });
 
-    // Generate RAG response
-    const { answer, sources } = await answerWithRAG(
+    // Run orchestrator to update project requirements, regenerate files, and materialize runtime
+    const orchResult = await orchestrateProjectRequest({
       projectId,
-      project.title,
-      project.description,
-      text
-    );
+      userId: userId || project.owner,
+      prompt: text,
+    });
 
-    // Save Assistant message with citations
+    const replyText = orchResult.orchestratorMessage || `I understand. I've updated ${project.title} with your request.`;
+
+    // Save Assistant message with agentStatuses and actionButtons
     const assistantMsg = await Message.create({
       projectId,
       sender: "assistant",
-      text: answer,
-      sources,
+      text: replyText,
+      agentStatuses: orchResult.agentStatuses || [],
+      actionButtons: orchResult.actionButtons || [],
     });
 
     res.json(assistantMsg);
   } catch (error) {
+    console.error("Chat Controller Error:", error.message);
     res.status(500).json({ message: error.message });
   }
 };

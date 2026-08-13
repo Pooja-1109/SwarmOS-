@@ -11,6 +11,7 @@ import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 
 import ProtectedRoute from "./components/ProtectedRoute";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 function App() {
   return (
@@ -23,7 +24,9 @@ function App() {
         path="/dashboard"
         element={
           <ProtectedRoute>
-            <Dashboard />
+            <ErrorBoundary fallbackTitle="Dashboard encountered an error.">
+              <Dashboard />
+            </ErrorBoundary>
           </ProtectedRoute>
         }
       />
@@ -32,7 +35,9 @@ function App() {
         path="/workspace"
         element={
           <ProtectedRoute>
-            <Workspace />
+            <ErrorBoundary fallbackTitle="SwarmOS Build encountered an error.">
+              <Workspace />
+            </ErrorBoundary>
           </ProtectedRoute>
         }
       />
@@ -41,7 +46,9 @@ function App() {
         path="/projects"
         element={
           <ProtectedRoute>
-            <Projects />
+            <ErrorBoundary fallbackTitle="Projects encountered an error.">
+              <Projects />
+            </ErrorBoundary>
           </ProtectedRoute>
         }
       />
@@ -50,7 +57,9 @@ function App() {
         path="/whatsapp"
         element={
           <ProtectedRoute>
-            <WhatsAppPage />
+            <ErrorBoundary fallbackTitle="SwarmOS Assistant encountered an error.">
+              <WhatsAppPage />
+            </ErrorBoundary>
           </ProtectedRoute>
         }
       />

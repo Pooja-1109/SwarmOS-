@@ -21,6 +21,18 @@ const messageSchema = new mongoose.Schema(
         snippet: String,
       },
     ],
+    agentStatuses: [
+      {
+        name: String,
+        status: String,
+      },
+    ],
+    actionButtons: [
+      {
+        label: String,
+        action: String,
+      },
+    ],
   },
   {
     timestamps: true,

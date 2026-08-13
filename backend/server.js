@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const fs = require("fs");
 const bcrypt = require("bcryptjs");
 require("dotenv").config();
 
@@ -61,6 +62,54 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Static directory for file downloads/views
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// Express Runtime Server Route for serving generated projects on http://localhost:5000/runtime/:projectId/
+app.use("/runtime/:projectId", (req, res) => {
+  const projectId = req.params.projectId;
+  const runtimeDir = path.join(__dirname, "runtime-projects", projectId);
+
+  if (!fs.existsSync(runtimeDir)) {
+    return res.status(404).send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <title>Runtime Not Active — SwarmOS</title>
+        <style>
+          body { background: #09090b; color: #f4f4f5; font-family: -apple-system, sans-serif; text-align: center; padding: 60px 20px; }
+          .card { background: #18181b; border: 1px solid #27272a; max-width: 480px; margin: 0 auto; padding: 32px; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
+          h2 { color: #f87171; margin-top: 0; }
+          p { color: #a1a1aa; font-size: 14px; line-height: 1.5; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h2>Project Runtime Stopped or Not Active</h2>
+          <p>Click <strong>▶ Run Project</strong> inside the SwarmOS Workspace to launch this application server.</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+
+  // Calculate relative subPath from req.path
+  let rawSubPath = req.path || "/index.html";
+  let subPath = rawSubPath === "/" ? "/index.html" : rawSubPath;
+  let targetFile = path.join(runtimeDir, subPath);
+
+  const normalizedTarget = path.normalize(targetFile);
+  if (!normalizedTarget.startsWith(runtimeDir)) {
+    return res.status(403).send("Forbidden: Invalid path traversal");
+  }
+
+  if (!fs.existsSync(normalizedTarget) || fs.statSync(normalizedTarget).isDirectory()) {
+    targetFile = path.join(runtimeDir, "index.html");
+  } else {
+    targetFile = normalizedTarget;
+  }
+
+  res.sendFile(targetFile);
+});
 
 // Home Route
 app.get("/", (req, res) => {

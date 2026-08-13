@@ -81,6 +81,11 @@ export default function Projects() {
         requirements: requirements || description,
       });
 
+      if (newProj && newProj._id) {
+        // Automatically start AI multi-agent swarm generation
+        await startAgents(newProj._id).catch((err) => console.warn("Swarm trigger notice:", err));
+      }
+
       setTitle("");
       setDescription("");
       setRequirements("");
@@ -93,7 +98,7 @@ export default function Projects() {
     } catch (error: any) {
       console.error(error);
       alert(error.response?.data?.message || "Unable to create project.");
-    } fontFinally: {
+    } finally {
       setCreating(false);
     }
   };

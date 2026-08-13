@@ -61,7 +61,7 @@ const syncProjectStateAcrossChannels = async (projectId, state = {}) => {
     },
   };
 
-  await Project.findByIdAndUpdate(projectId, update, { new: true });
+  await Project.findByIdAndUpdate(projectId, update, { returnDocument: "after" });
 
   const channels = await ProjectChannel.find({ projectId });
 

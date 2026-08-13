@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import Sidebar from "../components/layout/Sidebar";
 import { getDashboard } from "../services/dashboardService";
 import { createProject } from "../services/projectService";
+import { startAgents } from "../services/agentService";
 import { useAuth } from "../context/AuthContext";
 import {
   FolderKanban,
@@ -64,9 +65,13 @@ export default function Dashboard() {
         requirements: prompt,
       });
 
+      if (newProj && newProj._id) {
+        await startAgents(newProj._id).catch((err) => console.warn("Swarm trigger notice:", err));
+      }
+
       setTimeout(() => {
-        navigate(`/workspace?id=${newProj._id}`);
-      }, 1200);
+        navigate(`/workspace?id=${newProj._id}&tab=build`);
+      }, 500);
     } catch (err: any) {
       console.error("Failed to create project:", err);
       alert(err.response?.data?.message || "Failed to create project.");
@@ -111,6 +116,61 @@ export default function Dashboard() {
         ) : (
           dashboard && (
             <>
+              {/* Natural Language Hero Build Box */}
+              <div className="mb-8 rounded-3xl border border-cyan-500/30 bg-gradient-to-r from-cyan-950/40 via-zinc-900 to-zinc-900 p-6 shadow-2xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
+                    <Sparkles size={18} /> What would you like to build today?
+                  </div>
+                  <span className="text-[10px] text-zinc-400 font-mono bg-zinc-950 px-2.5 py-1 rounded-full border border-zinc-800">
+                    SwarmOS AI Team Ready
+                  </span>
+                </div>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!ideaPrompt.trim()) return;
+                    setShowModal(true);
+                  }}
+                  className="flex flex-col sm:flex-row gap-3"
+                >
+                  <input
+                    type="text"
+                    value={ideaPrompt}
+                    onChange={(e) => setIdeaPrompt(e.target.value)}
+                    placeholder="Describe what you want to build (e.g. Build a library management system)..."
+                    className="flex-1 rounded-2xl bg-zinc-950 border border-zinc-800 px-5 py-3.5 text-xs text-white outline-none focus:border-cyan-500 transition shadow-inner"
+                  />
+                  <button
+                    type="submit"
+                    className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3.5 text-xs font-extrabold text-white shadow-lg shadow-cyan-950 hover:brightness-110 transition shrink-0"
+                  >
+                    <Sparkles size={16} /> ✨ Build with SwarmOS
+                  </button>
+                </form>
+
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-zinc-400 pt-1">
+                  <span className="font-semibold text-zinc-500">Suggestions:</span>
+                  {[
+                    "Build a library management system",
+                    "Build a student attendance management system",
+                    "Build a restaurant ordering system",
+                    "Build an inventory & stock tracker",
+                  ].map((sug, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        setIdeaPrompt(sug);
+                        setShowModal(true);
+                      }}
+                      className="px-3 py-1 rounded-full bg-zinc-950 border border-zinc-800 text-zinc-300 hover:border-cyan-500 hover:text-white transition"
+                    >
+                      + {sug}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {/* Metrics Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 {/* Total Projects */}

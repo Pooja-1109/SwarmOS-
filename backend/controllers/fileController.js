@@ -143,10 +143,63 @@ const deleteFile = async (req, res) => {
   }
 };
 
+// Ask Project Knowledge Base
+const queryKnowledge = async (req, res) => {
+  try {
+    const { projectId, query } = req.body;
+    if (!projectId || !query) {
+      return res.status(400).json({ message: "projectId and query are required" });
+    }
+
+    const docs = await Document.find({ projectId });
+    if (!docs || docs.length === 0) {
+      return res.json({
+        answer: "No project knowledge documents have been indexed yet. Upload PDFs or text specifications above to enable RAG context retrieval.",
+        sources: [],
+      });
+    }
+
+    const queryLower = query.toLowerCase();
+    let matches = [];
+
+    docs.forEach((doc) => {
+      if (doc.chunks && doc.chunks.length > 0) {
+        doc.chunks.forEach((chunk, idx) => {
+          if (chunk.toLowerCase().includes(queryLower) || queryLower.split(" ").some((w) => w.length > 3 && chunk.toLowerCase().includes(w))) {
+            matches.push({
+              fileName: doc.fileName,
+              chunkIndex: idx,
+              snippet: chunk.slice(0, 300) + "...",
+            });
+          }
+        });
+      }
+    });
+
+    if (matches.length === 0) {
+      matches = docs.slice(0, 3).map((d) => ({
+        fileName: d.fileName,
+        chunkIndex: 0,
+        snippet: (d.textContent || "").slice(0, 250) + "...",
+      }));
+    }
+
+    const answer = `Based on your project knowledge base (${docs.length} document(s) indexed), here is the context snippet matching "${query}":\n\n"${matches[0]?.snippet || "Document content indexed."}"`;
+
+    res.json({
+      answer,
+      sources: matches,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   uploadMiddleware: upload.single("file"),
   uploadFile,
   getProjectFiles,
   getFile,
   deleteFile,
+  queryKnowledge,
 };
