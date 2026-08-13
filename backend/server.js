@@ -147,7 +147,7 @@ const startServer = async () => {
   await connectDB();
   await seedDefaultAdmin();
 
-  app.listen(PORT, () => {
+  app.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 SwarmOS Backend running on port ${PORT}`);
   });
 };
