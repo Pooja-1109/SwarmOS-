@@ -5,15 +5,11 @@ services:
   # 1. SwarmOS Backend Web Service (Node.js/Express)
   - type: web
     name: swarmos-backend
-    env: node
-    region: singapore
-    plan: free
+    runtime: node
     rootDir: backend
     buildCommand: npm install
     startCommand: npm start
     envVars:
-      - key: PORT
-        value: 5000
       - key: NODE_ENV
         value: production
       - key: MONGODB_URI
@@ -26,9 +22,7 @@ services:
   # 2. SwarmOS Frontend Static Site (React/Vite)
   - type: web
     name: swarmos-frontend
-    env: static
-    region: singapore
-    plan: free
+    runtime: static
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
@@ -38,8 +32,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: swarmos-backend
-          property: url
-        suffix: /api
+        sync: false
